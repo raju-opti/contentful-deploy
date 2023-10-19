@@ -183,6 +183,16 @@ export default class AppPage extends React.Component {
           name: 'Experiment Key',
           type: 'Symbol',
         },
+        {
+          id: 'flagKey',
+          name: 'Flag Key',
+          type: 'Symbol',
+        },
+        {
+          id: 'flagId',
+          name: 'Flag ID',
+          type: 'Symbol',
+        },
       ],
     });
 
