@@ -5,6 +5,7 @@ import SectionSplitter from '../EditorPage/subcomponents/section-splitter';
 import Projects from './Projects';
 import ContentTypes from './ContentTypes';
 import { ProjectType } from '../constants';
+
 export default class Config extends React.Component {
   static propTypes = {
     client: PropTypes.object.isRequired,
@@ -33,8 +34,6 @@ export default class Config extends React.Component {
   }
 
   onProjectChange = (allProjects, event) => {
-    console.log(allProjects, event.target.value);
-
     const projectId = event.target.value;
     const project = allProjects.find((p) => String(p.id) === projectId);
     const projectType = project['is_flags_enabled'] 
