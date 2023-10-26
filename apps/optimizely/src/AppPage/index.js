@@ -63,6 +63,7 @@ export default class AppPage extends React.Component {
     this.state = {
       config: {
         optimizelyProjectId: '',
+        optimizelyProjectType: '',
         contentTypes: {},
       },
       allContentTypes: [],
@@ -88,6 +89,9 @@ export default class AppPage extends React.Component {
           optimizelyProjectId: currentParameters
             ? currentParameters.optimizelyProjectId
             : prevState.optimizelyProjectId,
+          optimizelyProjectType: currentParameters
+            ? currentParameters.optimizelyProjectType
+            : prevState.optimizelyProjectType,
         },
       }),
       () => app.setReady()
@@ -136,6 +140,7 @@ export default class AppPage extends React.Component {
     return {
       parameters: {
         optimizelyProjectId: config.optimizelyProjectId,
+        optimizelyProjectType: config.optimizelyProjectType,
       },
       targetState: {
         EditorInterface: {
