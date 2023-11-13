@@ -1,5 +1,5 @@
 /* eslint-disable jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events, jsx-a11y/anchor-is-valid */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { css } from 'emotion';
 import useMethods from 'use-methods';
@@ -14,6 +14,9 @@ import { SDKContext, GlobalStateContext } from './subcomponents/all-context';
 import prepareReferenceInfo, { COMBINED_LINK_VALIDATION_CONFLICT } from './reference-info';
 import useInterval from '@use-it/interval';
 import ConnectButton from '../ConnectButton';
+import { ProjectType } from '../constants';
+import { act } from '@testing-library/react';
+import { isFxProject } from '../util';
 
 const styles = {
   root: css({
@@ -55,6 +58,17 @@ const methods = (state) => {
     setExperimentResults(id, results) {
       state.experimentsResults[id] = results;
     },
+    setRuleDetails(id, variations, experimentId, campaignId) {
+      const index = state.experiments.findIndex(
+        (experiment) => experiment.id.toString() === id.toString()
+      );
+
+      if (index != -1) {
+        state.experiments[index].variations = variations;
+        state.experiments[index].ruleExperimentId = experimentId;
+        state.experiments[index].campaign_id = campaignId;
+      }
+    },
     updateExperiment(id, experiment) {
       const index = state.experiments.findIndex(
         (experiment) => experiment.id.toString() === id.toString()
@@ -74,6 +88,7 @@ const getInitialValue = (sdk) => ({
   meta: sdk.entry.fields.meta.getValue() || {},
   variations: sdk.entry.fields.variations.getValue() || [],
   experimentId: sdk.entry.fields.experimentId.getValue(),
+  flagKey: sdk.entry.fields.flagKey.getValue(),
   entries: {},
   experimentsResults: {},
 });
@@ -116,10 +131,13 @@ const getEntriesLinkedByIds = async (space, entryIds) => {
 const fetchInitialData = async (sdk, client) => {
   const { space, ids, locales } = sdk;
 
+  const { optimizelyProjectType } = sdk.parameters.installation;
+
   const [contentTypesRes, entriesRes, experiments] = await Promise.all([
     space.getContentTypes({ order: 'name', limit: 1000 }),
     getEntriesLinkedByIds(space, ids.entry),
-    client.getExperiments(),
+    optimizelyProjectType === ProjectType.FeatureExperimentation ? 
+      client.getRules() : client.getExperiments(),
   ]);
 
   return {
@@ -141,6 +159,14 @@ function isCloseToExpiration(expires) {
 }
 
 export default function EditorPage(props) {
+  const isMounted = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
   const globalState = useMethods(methods, getInitialValue(props.sdk));
   const [state, actions] = globalState;
   const [showAuth, setShowAuth] = useState(isCloseToExpiration(props.expires));
@@ -148,7 +174,25 @@ export default function EditorPage(props) {
   const experiment = state.experiments.find(
     (experiment) => experiment.id.toString() === state.experimentId
   );
+  
+  /**
+   * Fetch rule variations and experiment id for FX projects
+   */
+  useEffect(() => {
+    if (experiment && isFxProject(props.sdk) && !experiment.variations) {
+      props.client
+        .getRule(experiment.flag_key, experiment.key)
+        .then((rule) => {
+          console.log(rule);
+          if (isMounted.current) {
+            actions.setRuleDetails(experiment.id, Object.values(rule.variations), rule.experiment_id, rule.layer_id);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [state.experimentId, state.loaded]);
 
+  
   /**
    * Fetch initial portion of data required to render initial state
    */
@@ -166,17 +210,17 @@ export default function EditorPage(props) {
   /**
    * Pulling current experiment every 5s to get new status and variations
    */
-  useInterval(() => {
-    if (state.experimentId) {
-      props.client
-        .getExperiment(state.experimentId)
-        .then((experiment) => {
-          actions.updateExperiment(state.experimentId, experiment);
-          return experiment;
-        })
-        .catch(() => {});
-    }
-  }, 5000);
+  // useInterval(() => {
+  //   if (state.experimentId) {
+  //     props.client
+  //       .getExperiment(state.experimentId)
+  //       .then((experiment) => {
+  //         actions.updateExperiment(state.experimentId, experiment);
+  //         return experiment;
+  //       })
+  //       .catch(() => {});
+  //   }
+  // }, 5000);
 
   /*
    * Poll to see if we need to show the reauth flow preemptively
@@ -191,6 +235,7 @@ export default function EditorPage(props) {
   useEffect(() => {
     const unsubsribeExperimentChange = props.sdk.entry.fields.experimentId.onValueChanged(
       (data) => {
+        console.log('exp id change .. ', data);
         actions.setExperimentId(data);
       }
     );
@@ -198,6 +243,7 @@ export default function EditorPage(props) {
       actions.setVariations(data || []);
     });
     const unsubscribeMetaChange = props.sdk.entry.fields.meta.onValueChanged((data) => {
+      console.log('meta change .. ', data);
       actions.setMeta(data || {});
     });
     return () => {
@@ -227,8 +273,19 @@ export default function EditorPage(props) {
    */
   useEffect(() => {
     if (state.loaded && experiment) {
+      let experimentId;
+      if (isFxProject(props.sdk)) {
+        if (experiment.ruleExperimentId) {
+          experimentId = experiment.ruleExperimentId;
+        } else {
+          return;
+        }
+      } else {
+        experimentId = experiment.id;
+      }
+
       props.client
-        .getExperimentResults(experiment.id)
+        .getExperimentResults(experimentId)
         .then((results) => {
           actions.setExperimentResults(experiment.id, results);
           return results;
@@ -241,8 +298,10 @@ export default function EditorPage(props) {
     if (!experiment) {
       return undefined;
     }
+
+    const experimentId = isFxProject(props.sdk) ? experiment.ruleExperimentId : experiment.id;
     return {
-      url: props.client.getResultsUrl(experiment.campaign_id, experiment.id),
+      url: props.client.getResultsUrl(experiment.campaign_id, experimentId),
       results: state.experimentsResults[experiment.id],
     };
   };
@@ -251,10 +310,18 @@ export default function EditorPage(props) {
    * Handlers
    */
 
-  const onChangeExperiment = (value) => {
-    props.sdk.entry.fields.meta.setValue({});
-    props.sdk.entry.fields.experimentId.setValue(value.experimentId);
-    props.sdk.entry.fields.experimentKey.setValue(value.experimentKey);
+  const onChangeExperiment = (experiment) => {
+    console.log('exp selected ', experiment);
+    if (isFxProject(props.sdk)) {
+      props.sdk.entry.fields.meta.setValue({});
+      props.sdk.entry.fields.experimentId.setValue(experiment.id.toString());
+      props.sdk.entry.fields.experimentKey.setValue(experiment.key);
+      props.sdk.entry.fields.flagKey.setValue(experiment.flag_key);
+    } else {
+      props.sdk.entry.fields.meta.setValue({});
+      props.sdk.entry.fields.experimentId.setValue(experiment.experimentId.toString());
+      props.sdk.entry.fields.experimentKey.setValue(experiment.experimentKey);
+    }
   };
 
   const onLinkVariation = async (variation) => {
@@ -358,6 +425,7 @@ export default function EditorPage(props) {
             experiment={experiment}
             variations={state.variations}
             entries={state.entries}
+            sdk = {props.sdk}
           />
           <SectionSplitter />
           {showAuth && (
