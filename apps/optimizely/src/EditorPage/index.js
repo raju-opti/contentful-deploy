@@ -319,7 +319,7 @@ export default function EditorPage(props) {
       props.sdk.entry.fields.flagKey.setValue(experiment.flag_key);
     } else {
       props.sdk.entry.fields.meta.setValue({});
-      props.sdk.entry.fields.experimentId.setValue(experiment.experimentId.toString());
+      props.sdk.entry.fields.experimentId.setValue(experiment.id.toString());
       props.sdk.entry.fields.experimentKey.setValue(experiment.experimentKey);
     }
   };
