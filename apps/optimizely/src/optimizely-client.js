@@ -76,8 +76,9 @@ export default class OptimizelyClient {
     }
   };
 
-  getProjects() {
-    return this._getItemsPerPage('project');
+  getProjects = async () => {
+    const allProjects = await this._getItemsPerPage('project');
+    return allProjects.filter((project) => project.status === 'active');
   }
 
   getExperiment = (experimentId) => {
