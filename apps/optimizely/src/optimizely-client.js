@@ -91,13 +91,12 @@ export default class OptimizelyClient {
 
   getRules = async () => {
     let url = `/projects/${this.project}/rules` +
-      '?rule_types=a/b,mab&archived=false&environments=production&page_window=1&per_page=1';
+      '?rule_types=a/b,mab&archived=false&environments=production&page_window=1&per_page=100';
 
     let items = [];
 
     while(true) {
       const response = await this.makeRequest(`${this.fxBaseUrl}${url}`);
-      console.log(response);
       if (response.items) {
         items = [...items, ...response.items];
       }
@@ -107,7 +106,6 @@ export default class OptimizelyClient {
         break;
       }
     }
-    console.log(items);
     return items;
   };
 

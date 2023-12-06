@@ -1,5 +1,5 @@
 /* eslint-disable jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events, jsx-a11y/anchor-is-valid */
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { css } from 'emotion';
 import useMethods from 'use-methods';
@@ -15,8 +15,8 @@ import prepareReferenceInfo, { COMBINED_LINK_VALIDATION_CONFLICT } from './refer
 import useInterval from '@use-it/interval';
 import ConnectButton from '../ConnectButton';
 import { ProjectType } from '../constants';
-import { act } from '@testing-library/react';
 import { isFxProject } from '../util';
+import { useLatest } from '../hook';
 
 const styles = {
   root: css({
@@ -63,7 +63,7 @@ const methods = (state) => {
         (experiment) => experiment.id.toString() === id.toString()
       );
 
-      if (index != -1) {
+      if (index !== -1) {
         state.experiments[index].variations = variations;
         state.experiments[index].ruleExperimentId = experimentId;
         state.experiments[index].campaign_id = campaignId;
@@ -159,14 +159,6 @@ function isCloseToExpiration(expires) {
 }
 
 export default function EditorPage(props) {
-  const isMounted = useRef(true);
-
-  useEffect(() => {
-    return () => {
-      isMounted.current = false;
-    };
-  }, []);
-
   const globalState = useMethods(methods, getInitialValue(props.sdk));
   const [state, actions] = globalState;
   const [showAuth, setShowAuth] = useState(isCloseToExpiration(props.expires));
@@ -175,24 +167,43 @@ export default function EditorPage(props) {
     (experiment) => experiment.id.toString() === state.experimentId
   );
   
+  const getLatestClient = useLatest(props.client);
+  const getLatestSdk = useLatest(props.sdk);
+
+
+  const hasExperiment = !!experiment;
+  const flagKey = experiment && experiment.flag_key;
+  const ruleKey = experiment && experiment.key;
+  const hasVariations = experiment && experiment.variations;
+
   /**
    * Fetch rule variations and experiment id for FX projects
    */
   useEffect(() => {
-    if (experiment && isFxProject(props.sdk) && !experiment.variations) {
-      props.client
-        .getRule(experiment.flag_key, experiment.key)
+    let isActive = true;
+    
+    const client = getLatestClient();
+    const sdk = getLatestSdk();
+
+    if (hasExperiment && isFxProject(sdk) && !hasVariations) {
+      client
+        .getRule(flagKey, ruleKey)
         .then((rule) => {
           console.log(rule);
-          if (isMounted.current) {
-            actions.setRuleDetails(experiment.id, Object.values(rule.variations), rule.experiment_id, rule.layer_id);
+          if (isActive) {
+            actions.setRuleDetails(state.experimentId, Object.values(rule.variations), rule.experiment_id, rule.layer_id);
           }
         })
-        .catch(() => {});
+        .catch(() => {
+          actions.setError('Unable to load variations');
+        });
     }
-  }, [state.experimentId, state.loaded]);
 
-  
+    return () => {
+      isActive = false;
+    }
+  }, [hasExperiment, state.experimentId, flagKey, ruleKey, hasVariations, getLatestClient, getLatestSdk, actions]);
+
   /**
    * Fetch initial portion of data required to render initial state
    */
@@ -210,6 +221,49 @@ export default function EditorPage(props) {
   /**
    * Pulling current experiment every 5s to get new status and variations
    */
+  useEffect(() => {
+    let isActive = true;
+    const interval = setInterval(() => {
+      if (hasExperiment) {
+        const client = getLatestClient();
+        const sdk = getLatestSdk();
+
+        if (isFxProject(sdk)) {
+          client
+            .getRule(flagKey, ruleKey)
+            .then((rule) => {
+              if (isActive) {
+                const variations = Object.values(rule.variations);
+                const ruleExperimentId = rule.experiment_id;
+                const campaignId = rule.layer_id;
+                const experiment = rule;
+                experiment.variations = variations;
+                experiment.ruleExperimentId = ruleExperimentId;
+                experiment.campaign_id = campaignId;
+                actions.updateExperiment(state.experimentId, experiment);
+              }
+            })
+            .catch(() => {});
+        } else {
+          client
+            .getExperiment(state.experimentId)
+            .then((experiment) => {
+              if (isActive) {
+                actions.updateExperiment(state.experimentId, experiment);
+              }
+              return experiment;
+            })
+            .catch(() => {});
+        }        
+      }
+    }, 5000);
+
+    return () => {
+      clearInterval(interval);
+      isActive = false;
+    }
+  }, [hasExperiment, state.experimentId, flagKey, ruleKey, getLatestClient, getLatestSdk, actions]);  
+
   // useInterval(() => {
   //   if (state.experimentId) {
   //     props.client
@@ -268,31 +322,37 @@ export default function EditorPage(props) {
     }
   }, [experiment, props.sdk.entry.fields.experimentTitle, state.loaded]);
 
+  const selectedId = state.experimentId;
+  const ruleExperimentId = experiment && experiment.ruleExperimentId;
+
   /**
    * Fetch experiment results every time experiment is changed
    */
   useEffect(() => {
-    if (state.loaded && experiment) {
+    const client = getLatestClient();
+    const sdk = getLatestSdk();
+
+    if (state.loaded && hasExperiment) {
       let experimentId;
-      if (isFxProject(props.sdk)) {
-        if (experiment.ruleExperimentId) {
-          experimentId = experiment.ruleExperimentId;
+      if (isFxProject(sdk)) {
+        if (ruleExperimentId) {
+          experimentId = ruleExperimentId;
         } else {
           return;
         }
       } else {
-        experimentId = experiment.id;
+        experimentId = selectedId;
       }
 
-      props.client
+      client
         .getExperimentResults(experimentId)
         .then((results) => {
-          actions.setExperimentResults(experiment.id, results);
+          actions.setExperimentResults(selectedId, results);
           return results;
         })
         .catch(() => {});
     }
-  }, [actions, experiment, props.client, state.loaded]);
+  }, [actions, hasExperiment, selectedId, ruleExperimentId, getLatestClient, getLatestSdk, state.loaded]);
 
   const getExperimentResults = (experiment) => {
     if (!experiment) {
