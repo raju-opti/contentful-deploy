@@ -22,8 +22,6 @@ export default class OptimizelyClient {
       return await response.json();
     }
 
-    console.log(response);
-
     // reauthing should hopefully fix the issue
     this.onReauth();
   };
