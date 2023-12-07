@@ -41,8 +41,6 @@ Container.propTypes = {
 function mergeReferencesAndVariations(variationReferences, variations, meta) {
   const linkedReferences = Object.values(meta);
 
-  console.log(variations, typeof variations);
-
   const mappedVariations = variations.map((variation) => {
     const entryId = meta[variation.key];
     const reference = variationReferences.find((item) => item.sys.id === entryId);

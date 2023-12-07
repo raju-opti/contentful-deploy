@@ -31,6 +31,18 @@ const styles = {
   }),
 };
 
+const updatetFxRuleFields = (fxRule) => {
+  const variations = fxRule.variations ? Object.values(fxRule.variations) : [];
+  const ruleExperimentId = fxRule.experiment_id;
+  const campaignId = fxRule.layer_id;
+  const status = fxRule.enabled ? 'enabled' : 'disabled';
+
+  fxRule.variations = variations;
+  fxRule.ruleExperimentId = ruleExperimentId;
+  fxRule.campaign_id = campaignId;
+  fxRule.status = status;
+}
+
 const methods = (state) => {
   return {
     setInitialData({ experiments, contentTypes, referenceInfo }) {
@@ -42,8 +54,8 @@ const methods = (state) => {
     setError(message) {
       state.error = message;
     },
-    setExperimentId(id) {
-      state.experimentId = id;
+    setSelectedId(id) {
+      state.selectedId = id;
       state.meta = {};
     },
     setVariations(variations) {
@@ -58,17 +70,28 @@ const methods = (state) => {
     setExperimentResults(id, results) {
       state.experimentsResults[id] = results;
     },
-    setRuleDetails(id, variations, experimentId, campaignId) {
+    updateFxExperimentRule(id, fxRule) {
       const index = state.experiments.findIndex(
         (experiment) => experiment.id.toString() === id.toString()
       );
-
       if (index !== -1) {
-        state.experiments[index].variations = variations;
-        state.experiments[index].ruleExperimentId = experimentId;
-        state.experiments[index].campaign_id = campaignId;
+        const expriment = { ...state.experiments[index], ...fxRule };
+        updatetFxRuleFields(expriment);
+        state.experiments[index] = expriment;
       }
     },
+    // setRuleDetails(id, status, variations, experimentId, campaignId) {
+    //   const index = state.experiments.findIndex(
+    //     (experiment) => experiment.id.toString() === id.toString()
+    //   );
+
+    //   if (index !== -1) {
+    //     state.experiments[index].variations = variations;
+    //     state.experiments[index].ruleExperimentId = experimentId;
+    //     state.experiments[index].campaign_id = campaignId;
+    //     state.experiments[index].status = status;
+    //   }
+    // },
     updateExperiment(id, experiment) {
       const index = state.experiments.findIndex(
         (experiment) => experiment.id.toString() === id.toString()
@@ -87,7 +110,7 @@ const getInitialValue = (sdk) => ({
   contentTypes: [],
   meta: sdk.entry.fields.meta.getValue() || {},
   variations: sdk.entry.fields.variations.getValue() || [],
-  experimentId: sdk.entry.fields.experimentId.getValue(),
+  selectedId: sdk.entry.fields.experimentId.getValue(),
   flagKey: sdk.entry.fields.flagKey.getValue(),
   entries: {},
   experimentsResults: {},
@@ -163,13 +186,16 @@ export default function EditorPage(props) {
   const [state, actions] = globalState;
   const [showAuth, setShowAuth] = useState(isCloseToExpiration(props.expires));
 
+  const selectedId = state.selectedId;
+
   const experiment = state.experiments.find(
-    (experiment) => experiment.id.toString() === state.experimentId
+    (experiment) => experiment.id.toString() === state.selectedId
   );
   
   const getLatestClient = useLatest(props.client);
   const getLatestSdk = useLatest(props.sdk);
 
+  console.log('exp is .... ', experiment);
 
   const hasExperiment = !!experiment;
   const flagKey = experiment && experiment.flag_key;
@@ -189,9 +215,11 @@ export default function EditorPage(props) {
       client
         .getRule(flagKey, ruleKey)
         .then((rule) => {
-          console.log(rule);
+          const updatedRule = {}
           if (isActive) {
-            actions.setRuleDetails(state.experimentId, Object.values(rule.variations), rule.experiment_id, rule.layer_id);
+            const status = rule.enabled ? 'enabled' : 'disabled';
+            actions.updateFxExperimentRule(selectedId, rule);
+            // actions.setRuleDetails(selectedId, status, Object.values(rule.variations), rule.experiment_id, rule.layer_id);
           }
         })
         .catch(() => {
@@ -202,7 +230,7 @@ export default function EditorPage(props) {
     return () => {
       isActive = false;
     }
-  }, [hasExperiment, state.experimentId, flagKey, ruleKey, hasVariations, getLatestClient, getLatestSdk, actions]);
+  }, [hasExperiment, selectedId, flagKey, ruleKey, hasVariations, getLatestClient, getLatestSdk, actions]);
 
   /**
    * Fetch initial portion of data required to render initial state
@@ -210,6 +238,11 @@ export default function EditorPage(props) {
   useEffect(() => {
     fetchInitialData(props.sdk, props.client)
       .then((data) => {
+        if (isFxProject(props.sdk)) {
+          data.experiments.forEach((experiment) => {
+            updatetFxRuleFields(experiment);
+          });
+        }
         actions.setInitialData(data);
         return data;
       })
@@ -233,25 +266,17 @@ export default function EditorPage(props) {
             .getRule(flagKey, ruleKey)
             .then((rule) => {
               if (isActive) {
-                const variations = Object.values(rule.variations);
-                const ruleExperimentId = rule.experiment_id;
-                const campaignId = rule.layer_id;
-                const experiment = rule;
-                experiment.variations = variations;
-                experiment.ruleExperimentId = ruleExperimentId;
-                experiment.campaign_id = campaignId;
-                actions.updateExperiment(state.experimentId, experiment);
+                actions.updateFxExperimentRule(selectedId, rule);
               }
             })
             .catch(() => {});
         } else {
           client
-            .getExperiment(state.experimentId)
-            .then((experiment) => {
+            .getExperiment(selectedId)
+            .then((updatedExperiment) => {
               if (isActive) {
-                actions.updateExperiment(state.experimentId, experiment);
+                actions.updateExperiment(selectedId, updatedExperiment);
               }
-              return experiment;
             })
             .catch(() => {});
         }        
@@ -262,7 +287,7 @@ export default function EditorPage(props) {
       clearInterval(interval);
       isActive = false;
     }
-  }, [hasExperiment, state.experimentId, flagKey, ruleKey, getLatestClient, getLatestSdk, actions]);  
+  }, [hasExperiment, selectedId, flagKey, ruleKey, getLatestClient, getLatestSdk, actions]);  
 
   // useInterval(() => {
   //   if (state.experimentId) {
@@ -290,7 +315,7 @@ export default function EditorPage(props) {
     const unsubsribeExperimentChange = props.sdk.entry.fields.experimentId.onValueChanged(
       (data) => {
         console.log('exp id change .. ', data);
-        actions.setExperimentId(data);
+        actions.setSelectedId(data);
       }
     );
     const unsubscribeVariationsChange = props.sdk.entry.fields.variations.onValueChanged((data) => {
@@ -322,7 +347,6 @@ export default function EditorPage(props) {
     }
   }, [experiment, props.sdk.entry.fields.experimentTitle, state.loaded]);
 
-  const selectedId = state.experimentId;
   const ruleExperimentId = experiment && experiment.ruleExperimentId;
 
   /**
@@ -359,6 +383,8 @@ export default function EditorPage(props) {
       return undefined;
     }
 
+    console.log('props ', props);
+
     const experimentId = isFxProject(props.sdk) ? experiment.ruleExperimentId : experiment.id;
     return {
       url: props.client.getResultsUrl(experiment.campaign_id, experimentId),
@@ -380,7 +406,7 @@ export default function EditorPage(props) {
     } else {
       props.sdk.entry.fields.meta.setValue({});
       props.sdk.entry.fields.experimentId.setValue(experiment.id.toString());
-      props.sdk.entry.fields.experimentKey.setValue(experiment.experimentKey);
+      props.sdk.entry.fields.experimentKey.setValue(experiment.key);
     }
   };
 
