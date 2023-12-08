@@ -32,7 +32,7 @@ const styles = {
 };
 
 const updatetFxRuleFields = (fxRule) => {
-  const variations = fxRule.variations ? Object.values(fxRule.variations) : [];
+  const variations = fxRule.variations && Object.values(fxRule.variations);
   const ruleExperimentId = fxRule.experiment_id;
   const campaignId = fxRule.layer_id;
   const status = fxRule.enabled ? 'enabled' : 'disabled';
@@ -393,17 +393,10 @@ export default function EditorPage(props) {
    */
 
   const onChangeExperiment = (experiment) => {
-    console.log('exp selected ', experiment);
-    if (isFxProject(props.sdk)) {
-      props.sdk.entry.fields.meta.setValue({});
-      props.sdk.entry.fields.flagKey.setValue(experiment.flag_key);
-      props.sdk.entry.fields.experimentId.setValue(experiment.id.toString());
-      props.sdk.entry.fields.experimentKey.setValue(experiment.key);
-    } else {
-      props.sdk.entry.fields.meta.setValue({});
-      props.sdk.entry.fields.experimentId.setValue(experiment.id.toString());
-      props.sdk.entry.fields.experimentKey.setValue(experiment.key);
-    }
+    props.sdk.entry.fields.meta.setValue({});
+    props.sdk.entry.fields.flagKey.setValue(experiment.flag_key);
+    props.sdk.entry.fields.experimentId.setValue(experiment.id.toString());
+    props.sdk.entry.fields.experimentKey.setValue(experiment.key);
   };
 
   const onLinkVariation = async (variation) => {
