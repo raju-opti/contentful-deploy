@@ -195,8 +195,6 @@ export default function EditorPage(props) {
   const getLatestClient = useLatest(props.client);
   const getLatestSdk = useLatest(props.sdk);
 
-  console.log('exp is .... ', experiment);
-
   const hasExperiment = !!experiment;
   const flagKey = experiment && experiment.flag_key;
   const ruleKey = experiment && experiment.key;
@@ -383,8 +381,6 @@ export default function EditorPage(props) {
       return undefined;
     }
 
-    console.log('props ', props);
-
     const experimentId = isFxProject(props.sdk) ? experiment.ruleExperimentId : experiment.id;
     return {
       url: props.client.getResultsUrl(experiment.campaign_id, experimentId),
@@ -400,9 +396,9 @@ export default function EditorPage(props) {
     console.log('exp selected ', experiment);
     if (isFxProject(props.sdk)) {
       props.sdk.entry.fields.meta.setValue({});
+      props.sdk.entry.fields.flagKey.setValue(experiment.flag_key);
       props.sdk.entry.fields.experimentId.setValue(experiment.id.toString());
       props.sdk.entry.fields.experimentKey.setValue(experiment.key);
-      props.sdk.entry.fields.flagKey.setValue(experiment.flag_key);
     } else {
       props.sdk.entry.fields.meta.setValue({});
       props.sdk.entry.fields.experimentId.setValue(experiment.id.toString());

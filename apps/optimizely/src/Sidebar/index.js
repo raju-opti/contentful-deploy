@@ -29,6 +29,8 @@ const getAllExperimentsUrl = (projectId) => {
 
 export default function Sidebar(props) {
   const [experimentId, setExperimentId] = useState(props.sdk.entry.fields.experimentId.getValue());
+
+  console.log('sidebar fields ...', props.sdk.entry.fields.experimentId.getValue(), props.sdk.entry.fields.flagKey.getValue())
   const flagKey = props.sdk.entry.fields.flagKey.getValue();
 
   const { parameters } = props.sdk;
