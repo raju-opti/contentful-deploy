@@ -119,12 +119,18 @@ export default class AppPage extends React.Component {
       return false;
     }
 
-    const needsVariationContainerInSpace = !this.state.allContentTypes.find(
+    const variationContainerContentType = this.state.allContentTypes.find(
       (ct) => ct.sys.id === VARIATION_CONTAINER_ID
     );
-
-    if (needsVariationContainerInSpace) {
+    
+    if (!variationContainerContentType) {
       await this.createVariationContainerContentType();
+    } else {
+      const flagKeyField = variationContainerContentType.fields.find((f) => f.id === 'flagKey');
+
+      if (!flagKeyField) {
+        await this.updateVariationContainerContentType(variationContainerContentType);
+      }
     }
 
     const res = await this.saveEnabledContentTypes(
@@ -140,8 +146,6 @@ export default class AppPage extends React.Component {
       this.props.sdk.notifier.error('Something went wrong, please try again.');
       return false;
     }
-
-    console.log('returning config', config);
     
     return {
       parameters: {
@@ -207,6 +211,26 @@ export default class AppPage extends React.Component {
       ],
     });
 
+    await this.props.sdk.space.updateContentType(variationContainer);
+  };
+
+  updateVariationContainerContentType = async (variationContainer) => {
+    variationContainer.fields.push(
+      {
+        id: 'flagKey',
+        name: 'Flag Key',
+        type: 'Symbol',
+      },
+    );
+    if (!variationContainer.fields.find((f) => f.id === 'flagId')) {
+      variationContainer.fields.push(
+        {
+          id: 'flagId',
+          name: 'Flag Key',
+          type: 'Symbol',
+        },
+      );
+    }
     await this.props.sdk.space.updateContentType(variationContainer);
   };
 
