@@ -397,6 +397,7 @@ export default function EditorPage(props) {
     props.sdk.entry.fields.flagKey.setValue(experiment.flag_key);
     props.sdk.entry.fields.experimentId.setValue(experiment.id.toString());
     props.sdk.entry.fields.experimentKey.setValue(experiment.key);
+    props.sdk.entry.fields.environment.setValue(experiment.environment_key);
   };
 
   const onLinkVariation = async (variation) => {
@@ -520,6 +521,7 @@ export default function EditorPage(props) {
           <ExperimentSection
             loaded={state.loaded}
             disabled={experiment && state.variations.length > 0}
+            sdk={props.sdk}
             experiments={state.experiments}
             experiment={experiment}
             onChangeExperiment={onChangeExperiment}

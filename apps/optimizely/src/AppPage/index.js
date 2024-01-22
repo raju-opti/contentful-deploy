@@ -127,9 +127,19 @@ export default class AppPage extends React.Component {
       await this.createVariationContainerContentType();
     } else {
       const flagKeyField = variationContainerContentType.fields.find((f) => f.id === 'flagKey');
+      const flagIdField = variationContainerContentType.fields.find((f) => f.id === 'flagId');
+      const environmentField = variationContainerContentType.fields.find((f) => f.id === 'environment');
 
-      if (!flagKeyField) {
-        await this.updateVariationContainerContentType(variationContainerContentType);
+      console.log(flagKeyField, flagIdField, environmentField);
+
+      if (!flagKeyField || !flagIdField || !environmentField) {
+        await this.updateVariationContainerContentType(
+          variationContainerContentType, {
+            addFlagKey: !flagIdField,
+            addFlagId: !flagIdField,
+            addEnvironment: !environmentField,
+          }
+        );
       }
     }
 
@@ -208,25 +218,45 @@ export default class AppPage extends React.Component {
           name: 'Flag ID',
           type: 'Symbol',
         },
+        {
+          id: 'environment',
+          name: 'Environment Key',
+          type: 'Symbol',
+        },
       ],
     });
 
     await this.props.sdk.space.updateContentType(variationContainer);
   };
 
-  updateVariationContainerContentType = async (variationContainer) => {
-    variationContainer.fields.push(
-      {
-        id: 'flagKey',
-        name: 'Flag Key',
-        type: 'Symbol',
-      },
-    );
-    if (!variationContainer.fields.find((f) => f.id === 'flagId')) {
+  updateVariationContainerContentType = async (variationContainer, opt) => {
+    console.log('updating ', variationContainer, opt);
+    const { addFlagId, addFlagKey, addEnvironment } = opt;
+    if (addFlagKey) {
+      variationContainer.fields.push(
+        {
+          id: 'flagKey',
+          name: 'Flag Key',
+          type: 'Symbol',
+        },
+      );
+    }
+
+    if (addFlagId) {
       variationContainer.fields.push(
         {
           id: 'flagId',
           name: 'Flag Key',
+          type: 'Symbol',
+        },
+      );
+    }
+
+    if (addEnvironment) {
+      variationContainer.fields.push(
+        {
+          id: 'environment',
+          name: 'Environment Key',
           type: 'Symbol',
         },
       );
