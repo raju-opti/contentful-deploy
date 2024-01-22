@@ -10,6 +10,7 @@ import {
 } from '@contentful/forma-36-react-components';
 import tokens from '@contentful/forma-36-tokens';
 import { ExperimentType } from './prop-types';
+import { isFxProject } from '../../util';
 
 const styles = {
   heading: css({
@@ -31,6 +32,22 @@ const styles = {
 const NOT_SELECTED = '-1';
 
 export default function ExperimentSection(props) {
+  const displayNames = new Map();
+  if (props.experiments) {
+    props.experiments.forEach((experiment) => {
+      if (isFxProject(props.sdk)) {
+        const flagName = experiment.flag_name;
+        const ruleKey = experiment.key;
+        const environment = experiment.environment_key;
+        const onOff = experiment.enabled ? 'on' : 'off';
+        const displayName = `${ruleKey} (flag: ${flagName}, envrionment: ${environment}, ${onOff})`
+        displayNames.set(experiment.id.toString(), displayName);
+      } else {
+        const displayName = `${experiment.name || experiment.key} (${experiment.status})`;
+        displayNames.set(experiment.id.toString(), displayName);
+      }
+    });
+  }
   return (
     <React.Fragment>
       <Heading element="h2" className={styles.heading}>
@@ -72,7 +89,7 @@ export default function ExperimentSection(props) {
             <Option value={NOT_SELECTED}>Select Optimizely experiment</Option>
             {props.experiments.map((experiment) => (
               <Option key={experiment.id.toString()} value={experiment.id.toString()}>
-                {experiment.name || experiment.key} ({experiment.status})
+                {displayNames.get(experiment.id.toString())}
               </Option>
             ))}
           </React.Fragment>
@@ -96,6 +113,7 @@ export default function ExperimentSection(props) {
 ExperimentSection.propTypes = {
   loaded: PropTypes.bool.isRequired,
   disabled: PropTypes.bool,
+  sdk: PropTypes.object.isRequired,
   experiment: ExperimentType,
   experiments: PropTypes.arrayOf(ExperimentType.isRequired),
   onChangeExperiment: PropTypes.func.isRequired,
