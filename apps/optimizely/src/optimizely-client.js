@@ -89,7 +89,7 @@ export default class OptimizelyClient {
 
   getRules = async () => {
     let url = `/projects/${this.project}/rules` +
-      '?rule_types=a/b,mab&archived=false&environments=production&page_window=1&per_page=100';
+      '?rule_types=a/b,multi_armed_bandit&archived=false&environments=production&page_window=1&per_page=100';
 
     let items = [];
 
