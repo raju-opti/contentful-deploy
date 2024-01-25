@@ -11,12 +11,16 @@ const styles = {
   }),
 };
 
-const getFlagUrl = (projectId, flagKey, ruleKey) => {
+const getFlagUrl = (projectId, flagKey) => {
   return `https://app.optimizely.com/v2/projects/${projectId}/flags/manage/${flagKey}/rules/production`;
 };
 
-const getAllFlagsUrl = (projectId) => {
-  return `https://app.optimizely.com/v2/projects/${projectId}/flags/list`;
+const getRuleEditUrl = (projectId, flagKey, ruleKey, environment) => {
+  return `https://app.optimizely.com/v2/projects/${projectId}/flags/manage/${flagKey}/rules/${environment}/edit/${ruleKey}`;
+};
+
+const getAllFlagsUrl = (projectId, environment) => {
+  return `https://app.optimizely.com/v2/projects/${projectId}/flags/list?environment=${environment}`;
 };
 
 const getExperimentUrl = (projectId, experimentId) => {
@@ -32,6 +36,9 @@ export default function Sidebar(props) {
 
   console.log('sidebar fields ...', props.sdk.entry.fields.experimentId.getValue(), props.sdk.entry.fields.flagKey.getValue())
   const flagKey = props.sdk.entry.fields.flagKey.getValue();
+  // only used for FX project, the experimentKey field will have the key of the rule and the envrionment field will have the environment key
+  const ruleKey = props.sdk.entry.fields.experimentKey.getValue();
+  const environment = props.sdk.entry.fields.environment.getValue();
 
   const { parameters } = props.sdk;
 
@@ -60,7 +67,7 @@ export default function Sidebar(props) {
         isFullWidth
         className={styles.button}
         disabled={!experimentId}
-        href={isFxProject(props.sdk) ? getFlagUrl(projectId, flagKey) : getExperimentUrl(projectId, experimentId)}
+        href={isFxProject(props.sdk) ? getRuleEditUrl(projectId, flagKey, ruleKey, environment) : getExperimentUrl(projectId, experimentId)}
         target="_blank"
         data-test-id="view-experiment">
         View in Optimizely
@@ -69,8 +76,9 @@ export default function Sidebar(props) {
         buttonType="muted"
         isFullWidth
         className={styles.button}
+        disabled={isFxProject(props.sdk) && !experimentId}
         target="_blank"
-        href={isFxProject(props.sdk) ? getAllFlagsUrl(projectId) : getAllExperimentsUrl(projectId)}
+        href={isFxProject(props.sdk) ? getAllFlagsUrl(projectId, environment) : getAllExperimentsUrl(projectId)}
         data-test-id="view-all">
         <>{`View all ${isFxProject(props.sdk) ? 'flags' : 'experiments'}`}</>
       </Button>
