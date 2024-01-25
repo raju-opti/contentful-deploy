@@ -194,10 +194,13 @@ export default function EditorPage(props) {
   
   const getLatestClient = useLatest(props.client);
   const getLatestSdk = useLatest(props.sdk);
-
+  
+  console.log(experiment);
   const hasExperiment = !!experiment;
   const flagKey = experiment && experiment.flag_key;
   const ruleKey = experiment && experiment.key;
+  const environment = experiment && experiment.environment_key;
+  console.log('env is ', environment);
   const hasVariations = experiment && experiment.variations;
 
   /**
@@ -210,8 +213,9 @@ export default function EditorPage(props) {
     const sdk = getLatestSdk();
 
     if (hasExperiment && isFxProject(sdk) && !hasVariations) {
+      console.log('in effect ', flagKey, ruleKey, environment);
       client
-        .getRule(flagKey, ruleKey)
+        .getRule(flagKey, ruleKey, environment)
         .then((rule) => {
           const updatedRule = {}
           if (isActive) {
@@ -228,7 +232,7 @@ export default function EditorPage(props) {
     return () => {
       isActive = false;
     }
-  }, [hasExperiment, selectedId, flagKey, ruleKey, hasVariations, getLatestClient, getLatestSdk, actions]);
+  }, [hasExperiment, selectedId, flagKey, ruleKey, environment, hasVariations, getLatestClient, getLatestSdk, actions]);
 
   /**
    * Fetch initial portion of data required to render initial state
@@ -261,7 +265,7 @@ export default function EditorPage(props) {
 
         if (isFxProject(sdk)) {
           client
-            .getRule(flagKey, ruleKey)
+            .getRule(flagKey, ruleKey, environment)
             .then((rule) => {
               if (isActive) {
                 actions.updateFxExperimentRule(selectedId, rule);
@@ -395,9 +399,11 @@ export default function EditorPage(props) {
   const onChangeExperiment = (experiment) => {
     props.sdk.entry.fields.meta.setValue({});
     props.sdk.entry.fields.flagKey.setValue(experiment.flag_key);
-    props.sdk.entry.fields.experimentId.setValue(experiment.id.toString());
     props.sdk.entry.fields.experimentKey.setValue(experiment.key);
     props.sdk.entry.fields.environment.setValue(experiment.environment_key);
+    // setting experiment id last, so subscribing to experiment id change ensures 
+    // other fields are already up-to-date
+    props.sdk.entry.fields.experimentId.setValue(experiment.id.toString());
   };
 
   const onLinkVariation = async (variation) => {
