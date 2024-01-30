@@ -79,6 +79,15 @@ export default class OptimizelyClient {
     return allProjects.filter((project) => project.status === 'active');
   }
 
+  getProject = async (projectId) => {
+    console.log('req project', projectId);
+    return this.makeRequest(`${this.baseURL}/projects/${projectId}`);
+  };
+
+  getProjectEnvironments = async (projectId) => {
+    return this.makeRequest(`${this.baseURL}/environments?project_id=${projectId}`);
+  }
+
   getExperiment = (experimentId) => {
     return this.makeRequest(`${this.baseURL}/experiments/${experimentId}`);
   };

@@ -17,6 +17,7 @@ import ConnectButton from '../ConnectButton';
 import { ProjectType } from '../constants';
 import { isFxProject } from '../util';
 import { useLatest } from '../hook';
+import OptimizelyClient from '../optimizely-client';
 
 const styles = {
   root: css({
@@ -29,6 +30,10 @@ const styles = {
     cursor: 'pointer',
     textDecoration: 'underline',
   }),
+};
+
+const wait = (ms) => {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 };
 
 const updatetFxRuleFields = (fxRule) => {
@@ -45,7 +50,12 @@ const updatetFxRuleFields = (fxRule) => {
 
 const methods = (state) => {
   return {
-    setInitialData({ experiments, contentTypes, referenceInfo }) {
+    setInitialData({ 
+      isFx, fsToFxMigrated, primaryEnvironment, experiments, contentTypes, referenceInfo 
+    }) {
+      state.isFx = isFx;
+      state.fsToFxMigrated = fsToFxMigrated;
+      state.primaryEnvironment = primaryEnvironment;
       state.experiments = experiments;
       state.contentTypes = contentTypes;
       state.referenceInfo = referenceInfo;
@@ -56,6 +66,11 @@ const methods = (state) => {
     },
     setSelectedId(id) {
       state.selectedId = id;
+      state.meta = {};
+    },
+    setSelection(key, environment) {
+      state.selectedkey = key;
+      state.selectedEnvironment = environment;
       state.meta = {};
     },
     setVariations(variations) {
@@ -152,9 +167,40 @@ const getEntriesLinkedByIds = async (space, entryIds) => {
 };
 
 const fetchInitialData = async (sdk, client) => {
-  const { space, ids, locales } = sdk;
+  const { space, ids, locales, entry } = sdk;
+  const isNewEntry = !!sdk.entry.fields.experimentKey.getValue();
+  const entryHasEnvironment = !!sdk.entry.fields.envrionment.getValue()
 
-  const { optimizelyProjectType } = sdk.parameters.installation;
+  console.log('entry: ', sdk.entry.fields.experimentId.getValue(), sdk.entry.fields.experimentKey.getValue());
+  const { optimizelyProjectType, optimizelyProjectId } = sdk.parameters.installation;
+
+  let fsToFxMigrated = false;
+  let primaryEnvironment = '';
+
+  if (optimizelyProjectType === ProjectType.FullStack) {
+    const [project, environments] = await Promise.all([
+      client.getProject(optimizelyProjectId),
+      client.getProjectEnvironments(optimizelyProjectId),
+    ]);
+    if (project.is_flags_enabled) {
+      fsToFxMigrated = true;
+    }
+    environments.forEach((e) => {
+      if (e.is_primary) {
+        primaryEnvironment = e.key;
+      }
+    });
+
+    if (fsToFxMigrated) {
+      await sdk.entry.fields.environment.setValue(primaryEnvironment);
+      await sdk.entry.save();
+    }
+    
+    console.log('project', project, primaryEnvironment); 
+  }
+
+  console.log('after fetch jproject');
+  const isFx = optimizelyProjectType === ProjectType.FeatureExperimentation || fsToFxMigrated;
 
   const [contentTypesRes, entriesRes, experiments] = await Promise.all([
     space.getContentTypes({ order: 'name', limit: 1000 }),
@@ -163,7 +209,13 @@ const fetchInitialData = async (sdk, client) => {
       client.getRules() : client.getExperiments(),
   ]);
 
+  // await wait(10000);
+  console.log('done fetching initial data', isFx, fsToFxMigrated, environments);
+
   return {
+    isFx,
+    fsToFxMigrated,
+    primaryEnvironment,
     experiments,
     contentTypes: contentTypesRes.items,
     referenceInfo: prepareReferenceInfo({
@@ -186,10 +238,21 @@ export default function EditorPage(props) {
   const [state, actions] = globalState;
   const [showAuth, setShowAuth] = useState(isCloseToExpiration(props.expires));
 
-  const selectedId = state.selectedId;
+  // const selectedId = state.selectedId;
+  // const experiment = state.experiments.find(
+  //   (experiment) => experiment.id.toString() === state.selectedId
+  // );
+
+  const { isFx, fsToFxMigrated, primaryEnvironment, selectedKey, selectedEnvironment } = state;
 
   const experiment = state.experiments.find(
-    (experiment) => experiment.id.toString() === state.selectedId
+    (experiment) => {
+      if (!isFx) {
+        return experiment.key === selectedKey;
+      }
+      const environment = selectedEnvironment || primaryEnvironment;
+      return experiment.key === selectedKey && experiment.environment === environment;
+    }
   );
   
   const getLatestClient = useLatest(props.client);
@@ -202,6 +265,13 @@ export default function EditorPage(props) {
   const environment = experiment && experiment.environment_key;
   console.log('env is ', environment);
   const hasVariations = experiment && experiment.variations;
+
+  /** update entry in case of fs to fx migration */
+  useEffect(() => {
+    if (state.loaded && fsToFxMigrated) {
+
+    }
+  }, [state.loaded, fsToFxMigrated, getLatestSdk])
 
   /**
    * Fetch rule variations and experiment id for FX projects
@@ -240,10 +310,13 @@ export default function EditorPage(props) {
   useEffect(() => {
     fetchInitialData(props.sdk, props.client)
       .then((data) => {
-        if (isFxProject(props.sdk)) {
+        if (data.isFx) {
+          console.log('init fx project');
           data.experiments.forEach((experiment) => {
             updatetFxRuleFields(experiment);
           });
+        } else {
+          console.log('init fsss project');
         }
         actions.setInitialData(data);
         return data;
@@ -283,7 +356,7 @@ export default function EditorPage(props) {
             .catch(() => {});
         }        
       }
-    }, 5000);
+    }, 50000);
 
     return () => {
       clearInterval(interval);
@@ -314,10 +387,16 @@ export default function EditorPage(props) {
    * Subscribe for changes in entry
    */
   useEffect(() => {
-    const unsubsribeExperimentChange = props.sdk.entry.fields.experimentId.onValueChanged(
+    // const unsubsribeExperimentChange = props.sdk.entry.fields.experimentId.onValueChanged(
+    //   (data) => {
+    //     console.log('exp id change .. ', data);
+    //     actions.setSelectedId(data);
+    //   }
+    // );
+    const unsubsribeExperimentChange = props.sdk.entry.fields.experimentKey.onValueChanged(
       (data) => {
-        console.log('exp id change .. ', data);
-        actions.setSelectedId(data);
+        const envrionment = props.sdk.entry.fields.environment.getValue();
+        actions.setSelection(data, environment);
       }
     );
     const unsubscribeVariationsChange = props.sdk.entry.fields.variations.onValueChanged((data) => {
@@ -334,7 +413,8 @@ export default function EditorPage(props) {
     };
   }, [
     actions,
-    props.sdk.entry.fields.experimentId,
+    props.sdk.entry.fields.experimentKey,
+    props.sdk.entry.fields.environment,
     props.sdk.entry.fields.meta,
     props.sdk.entry.fields.variations,
   ]);
@@ -528,6 +608,7 @@ export default function EditorPage(props) {
             loaded={state.loaded}
             disabled={experiment && state.variations.length > 0}
             sdk={props.sdk}
+            isFx={state.isFx}
             experiments={state.experiments}
             experiment={experiment}
             onChangeExperiment={onChangeExperiment}

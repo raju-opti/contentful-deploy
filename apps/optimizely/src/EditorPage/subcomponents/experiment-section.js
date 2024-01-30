@@ -35,12 +35,13 @@ export default function ExperimentSection(props) {
   const displayNames = new Map();
   if (props.experiments) {
     props.experiments.forEach((experiment) => {
-      if (isFxProject(props.sdk)) {
+      if (props.isFx) {
         const flagName = experiment.flag_name;
-        const ruleKey = experiment.key;
+        const ruleKey = experiment.name || experiment.key;
         const environment = experiment.environment_key;
         const onOff = experiment.enabled ? 'on' : 'off';
         const displayName = `${ruleKey} (flag: ${flagName}, envrionment: ${environment}, ${onOff})`
+
         displayNames.set(experiment.id.toString(), displayName);
       } else {
         const displayName = `${experiment.name || experiment.key} (${experiment.status})`;
@@ -114,6 +115,7 @@ ExperimentSection.propTypes = {
   loaded: PropTypes.bool.isRequired,
   disabled: PropTypes.bool,
   sdk: PropTypes.object.isRequired,
+  isFx: PropTypes.bool.isRequired,
   experiment: ExperimentType,
   experiments: PropTypes.arrayOf(ExperimentType.isRequired),
   onChangeExperiment: PropTypes.func.isRequired,
