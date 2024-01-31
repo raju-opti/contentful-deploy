@@ -78,7 +78,7 @@ export default function VariationsSection(props) {
     );
   }
   
-  if (isFxProject(sdk) && !props.experiment.variations) {
+  if (props.isFx && !props.experiment.variations) {
     return (
       <Container>
          <Flex>
@@ -134,6 +134,7 @@ export default function VariationsSection(props) {
 
 VariationsSection.propTypes = {
   loaded: PropTypes.bool.isRequired,
+  isFx: PropTypes.bool.isRequired,
   experiment: ExperimentType,
   experimentResults: PropTypes.object,
   meta: PropTypes.object.isRequired,
