@@ -15,9 +15,7 @@ import prepareReferenceInfo, { COMBINED_LINK_VALIDATION_CONFLICT } from './refer
 import useInterval from '@use-it/interval';
 import ConnectButton from '../ConnectButton';
 import { ProjectType } from '../constants';
-import { isFxProject } from '../util';
 import { useLatest } from '../hook';
-import OptimizelyClient from '../optimizely-client';
 
 const styles = {
   root: css({
@@ -51,10 +49,10 @@ const updatetFxRuleFields = (fxRule) => {
 const methods = (state) => {
   return {
     setInitialData({ 
-      isFx, fsToFxMigrated, primaryEnvironment, experiments, contentTypes, referenceInfo 
+      isFx, primaryEnvironment, experiments, contentTypes, referenceInfo 
     }) {
+      console.log('set init action');
       state.isFx = isFx;
-      state.fsToFxMigrated = fsToFxMigrated;
       state.primaryEnvironment = primaryEnvironment;
       state.experiments = experiments;
       state.contentTypes = contentTypes;
@@ -64,30 +62,32 @@ const methods = (state) => {
     setError(message) {
       state.error = message;
     },
-    setSelectedId(id) {
-      state.selectedId = id;
-      state.meta = {};
-    },
-    setSelection(key, environment) {
-      state.selectedkey = key;
-      state.selectedEnvironment = environment;
+    setExperiment(experimentKey, environment) {
+      console.log('set experiment action');
+      state.experimentKey = experimentKey;
+      state.environment = environment;
       state.meta = {};
     },
     setVariations(variations) {
+      console.log('set variation action');
       state.variations = variations;
     },
     setEntry(id, entry) {
+      console.log('set entry action');
       state.entries[id] = entry;
     },
     setMeta(meta) {
+      console.log('set meta action');
       state.meta = meta;
     },
     setExperimentResults(id, results) {
+      console.log('set exp results action');
       state.experimentsResults[id] = results;
     },
-    updateFxExperimentRule(id, fxRule) {
+    updateFxExperimentRule(key, envrionment, fxRule) {
+      console.log('update fx rule action');
       const index = state.experiments.findIndex(
-        (experiment) => experiment.id.toString() === id.toString()
+        (experiment) => experiment.key === key && experiment.environment === envrionment
       );
       if (index !== -1) {
         const expriment = { ...state.experiments[index], ...fxRule };
@@ -108,6 +108,7 @@ const methods = (state) => {
     //   }
     // },
     updateExperiment(id, experiment) {
+      console.log('update exp action');
       const index = state.experiments.findIndex(
         (experiment) => experiment.id.toString() === id.toString()
       );
@@ -125,7 +126,8 @@ const getInitialValue = (sdk) => ({
   contentTypes: [],
   meta: sdk.entry.fields.meta.getValue() || {},
   variations: sdk.entry.fields.variations.getValue() || [],
-  selectedId: sdk.entry.fields.experimentId.getValue(),
+  experimentKey: sdk.entry.fields.experimentKey.getValue(),
+  environment: sdk.entry.fields.environment.getValue(),
   flagKey: sdk.entry.fields.flagKey.getValue(),
   entries: {},
   experimentsResults: {},
@@ -166,10 +168,15 @@ const getEntriesLinkedByIds = async (space, entryIds) => {
   return entriesRes;
 };
 
+
+// TODO: variation container might have missing fields if not reconfigured
+// TODO: installation param might have the projectType value missing
+// TODO: handle both cases
 const fetchInitialData = async (sdk, client) => {
+  console.log('fetching init ....');
   const { space, ids, locales, entry } = sdk;
   const isNewEntry = !!sdk.entry.fields.experimentKey.getValue();
-  const entryHasEnvironment = !!sdk.entry.fields.envrionment.getValue()
+  const entryHasEnvironment = !!sdk.entry.fields.environment.getValue()
 
   console.log('entry: ', sdk.entry.fields.experimentId.getValue(), sdk.entry.fields.experimentKey.getValue());
   const { optimizelyProjectType, optimizelyProjectId } = sdk.parameters.installation;
@@ -191,7 +198,7 @@ const fetchInitialData = async (sdk, client) => {
       }
     });
 
-    if (fsToFxMigrated) {
+    if (fsToFxMigrated && !isNewEntry && !entryHasEnvironment) {
       await sdk.entry.fields.environment.setValue(primaryEnvironment);
       await sdk.entry.save();
     }
@@ -210,11 +217,9 @@ const fetchInitialData = async (sdk, client) => {
   ]);
 
   // await wait(10000);
-  console.log('done fetching initial data', isFx, fsToFxMigrated, environments);
 
   return {
     isFx,
-    fsToFxMigrated,
     primaryEnvironment,
     experiments,
     contentTypes: contentTypesRes.items,
@@ -243,35 +248,28 @@ export default function EditorPage(props) {
   //   (experiment) => experiment.id.toString() === state.selectedId
   // );
 
-  const { isFx, fsToFxMigrated, primaryEnvironment, selectedKey, selectedEnvironment } = state;
+  const { isFx, primaryEnvironment, experimentKey, environment } = state;
+
+  console.log('state', state);
 
   const experiment = state.experiments.find(
     (experiment) => {
       if (!isFx) {
-        return experiment.key === selectedKey;
+        return experiment.key === experimentKey;
       }
-      const environment = selectedEnvironment || primaryEnvironment;
-      return experiment.key === selectedKey && experiment.environment === environment;
+      const env = environment || primaryEnvironment;
+      return experiment.key === experimentKey && experiment.environment === env;
     }
   );
   
+  const experimentId = experiment && (isFx ? experiment.ruleExperimentId : experiment.id);
+
   const getLatestClient = useLatest(props.client);
   const getLatestSdk = useLatest(props.sdk);
   
-  console.log(experiment);
   const hasExperiment = !!experiment;
   const flagKey = experiment && experiment.flag_key;
-  const ruleKey = experiment && experiment.key;
-  const environment = experiment && experiment.environment_key;
-  console.log('env is ', environment);
   const hasVariations = experiment && experiment.variations;
-
-  /** update entry in case of fs to fx migration */
-  useEffect(() => {
-    if (state.loaded && fsToFxMigrated) {
-
-    }
-  }, [state.loaded, fsToFxMigrated, getLatestSdk])
 
   /**
    * Fetch rule variations and experiment id for FX projects
@@ -280,21 +278,25 @@ export default function EditorPage(props) {
     let isActive = true;
     
     const client = getLatestClient();
-    const sdk = getLatestSdk();
 
-    if (hasExperiment && isFxProject(sdk) && !hasVariations) {
-      console.log('in effect ', flagKey, ruleKey, environment);
+    if (hasExperiment && isFx && !hasVariations) {
+      console.log('in effect ', flagKey, experimentKey, environment);
       client
-        .getRule(flagKey, ruleKey, environment)
+        .getRule(flagKey, experimentKey, environment)
         .then((rule) => {
-          const updatedRule = {}
+          const sdk = getLatestSdk();
+          // update experiment id field of the entry
+          if (sdk.entry.fields.experimentKey.getValue() === experimentKey
+            && sdk.entry.fields.environment.getValue() === environment) {
+              return sdk.entry.fields.experimentId.setValue(rule.experiment_id).then(() => rule);
+          }
+          return rule;
+        }).then((rule) => {
           if (isActive) {
-            const status = rule.enabled ? 'enabled' : 'disabled';
-            actions.updateFxExperimentRule(selectedId, rule);
-            // actions.setRuleDetails(selectedId, status, Object.values(rule.variations), rule.experiment_id, rule.layer_id);
+            actions.updateFxExperimentRule(experimentKey, environment, rule);
           }
         })
-        .catch(() => {
+        .catch((err) => {
           actions.setError('Unable to load variations');
         });
     }
@@ -302,7 +304,17 @@ export default function EditorPage(props) {
     return () => {
       isActive = false;
     }
-  }, [hasExperiment, selectedId, flagKey, ruleKey, environment, hasVariations, getLatestClient, getLatestSdk, actions]);
+  }, [
+    hasExperiment,
+    isFx,
+    experimentKey,
+    environment,
+    flagKey,
+    hasVariations,
+    getLatestClient,
+    getLatestSdk,
+    actions
+  ]);
 
   /**
    * Fetch initial portion of data required to render initial state
@@ -321,7 +333,8 @@ export default function EditorPage(props) {
         actions.setInitialData(data);
         return data;
       })
-      .catch(() => {
+      .catch((err) => {
+        console.log(err);
         actions.setError('Unable to load initial data');
       });
   }, [actions, props.client, props.sdk]);
@@ -336,21 +349,21 @@ export default function EditorPage(props) {
         const client = getLatestClient();
         const sdk = getLatestSdk();
 
-        if (isFxProject(sdk)) {
+        if (isFx) {
           client
-            .getRule(flagKey, ruleKey, environment)
+            .getRule(flagKey, experimentKey, environment)
             .then((rule) => {
               if (isActive) {
-                actions.updateFxExperimentRule(selectedId, rule);
+                actions.updateFxExperimentRule(experimentKey, environment, rule);
               }
             })
             .catch(() => {});
         } else {
           client
-            .getExperiment(selectedId)
+            .getExperiment(experimentId)
             .then((updatedExperiment) => {
               if (isActive) {
-                actions.updateExperiment(selectedId, updatedExperiment);
+                actions.updateExperiment(experimentId, updatedExperiment);
               }
             })
             .catch(() => {});
@@ -362,7 +375,17 @@ export default function EditorPage(props) {
       clearInterval(interval);
       isActive = false;
     }
-  }, [hasExperiment, selectedId, flagKey, ruleKey, getLatestClient, getLatestSdk, actions]);  
+  }, [
+    hasExperiment,
+    isFx,
+    experimentKey,
+    environment,
+    experimentId,
+    flagKey,
+    getLatestClient,
+    getLatestSdk,
+    actions
+  ]);  
 
   // useInterval(() => {
   //   if (state.experimentId) {
@@ -396,7 +419,7 @@ export default function EditorPage(props) {
     const unsubsribeExperimentChange = props.sdk.entry.fields.experimentKey.onValueChanged(
       (data) => {
         const envrionment = props.sdk.entry.fields.environment.getValue();
-        actions.setSelection(data, environment);
+        actions.setExperiment(data, environment);
       }
     );
     const unsubscribeVariationsChange = props.sdk.entry.fields.variations.onValueChanged((data) => {
@@ -419,56 +442,43 @@ export default function EditorPage(props) {
     props.sdk.entry.fields.variations,
   ]);
 
+  const experimentName = experiment && experiment.name;
   /**
    * Update title every time experiment is changed
    */
   useEffect(() => {
     if (state.loaded) {
-      const title = experiment ? `[Optimizely] ${experiment.name}` : '';
+      const title = hasExperiment ? `[Optimizely] ${experimentName}` : '';
       props.sdk.entry.fields.experimentTitle.setValue(title);
     }
-  }, [experiment, props.sdk.entry.fields.experimentTitle, state.loaded]);
-
-  const ruleExperimentId = experiment && experiment.ruleExperimentId;
+  }, [hasExperiment, experimentName, props.sdk.entry.fields.experimentTitle, state.loaded]);
 
   /**
    * Fetch experiment results every time experiment is changed
    */
   useEffect(() => {
     const client = getLatestClient();
-    const sdk = getLatestSdk();
 
-    if (state.loaded && hasExperiment) {
-      let experimentId;
-      if (isFxProject(sdk)) {
-        if (ruleExperimentId) {
-          experimentId = ruleExperimentId;
-        } else {
-          return;
-        }
-      } else {
-        experimentId = selectedId;
-      }
-
+    if (state.loaded && hasExperiment && experimentId) {
       client
         .getExperimentResults(experimentId)
         .then((results) => {
-          actions.setExperimentResults(selectedId, results);
+          actions.setExperimentResults(experimentId, results);
           return results;
         })
         .catch(() => {});
     }
-  }, [actions, hasExperiment, selectedId, ruleExperimentId, getLatestClient, getLatestSdk, state.loaded]);
+  }, [actions, hasExperiment, experimentId, getLatestClient, state.loaded]);
 
   const getExperimentResults = (experiment) => {
     if (!experiment) {
       return undefined;
     }
 
-    const experimentId = isFxProject(props.sdk) ? experiment.ruleExperimentId : experiment.id;
+    const experimentId = isFx ? experiment.ruleExperimentId : experiment.id;
     return {
       url: props.client.getResultsUrl(experiment.campaign_id, experimentId),
-      results: state.experimentsResults[experiment.id],
+      results: state.experimentsResults[experimentId],
     };
   };
 
@@ -479,11 +489,12 @@ export default function EditorPage(props) {
   const onChangeExperiment = (experiment) => {
     props.sdk.entry.fields.meta.setValue({});
     props.sdk.entry.fields.flagKey.setValue(experiment.flag_key);
-    props.sdk.entry.fields.experimentKey.setValue(experiment.key);
     props.sdk.entry.fields.environment.setValue(experiment.environment_key);
-    // setting experiment id last, so subscribing to experiment id change ensures 
+    const experimentId = (isFx ? experiment.ruleExperimentId : experiment.id) || '';
+    props.sdk.entry.fields.experimentId.setValue(experimentId.toString());
+    // setting experiment key last, so subscribing to experiment id change ensures 
     // other fields are already up-to-date
-    props.sdk.entry.fields.experimentId.setValue(experiment.id.toString());
+    props.sdk.entry.fields.experimentKey.setValue(experiment.key);
   };
 
   const onLinkVariation = async (variation) => {
@@ -617,6 +628,7 @@ export default function EditorPage(props) {
           <SectionSplitter />
           <VariationsSection
             loaded={state.loaded}
+            isFx={isFx}
             contentTypes={state.contentTypes}
             experiment={experiment}
             experimentResults={getExperimentResults(experiment)}

@@ -147,7 +147,7 @@ export default class App extends React.Component {
         return <MissingProjectId />;
       }
 
-      return <Sidebar sdk={sdk} />;
+      return <Sidebar sdk={sdk} client={client}/>;
     }
 
     if (location.is(locations.LOCATION_ENTRY_EDITOR)) {

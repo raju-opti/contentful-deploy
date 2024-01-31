@@ -31,6 +31,10 @@ const getAllExperimentsUrl = (projectId) => {
   return `https://app.optimizely.com/v2/projects/${projectId}/experiments`;
 };
 
+const fetchProjectData = async (client, projectId) => {
+  
+}
+
 export default function Sidebar(props) {
   const [experimentId, setExperimentId] = useState(props.sdk.entry.fields.experimentId.getValue());
 
@@ -100,4 +104,5 @@ Sidebar.propTypes = {
       }),
     }),
   }).isRequired,
+  client: PropTypes.any.isRequired,
 };
