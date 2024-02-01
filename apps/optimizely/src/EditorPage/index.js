@@ -14,8 +14,9 @@ import { SDKContext, GlobalStateContext } from './subcomponents/all-context';
 import prepareReferenceInfo, { COMBINED_LINK_VALIDATION_CONFLICT } from './reference-info';
 import useInterval from '@use-it/interval';
 import ConnectButton from '../ConnectButton';
-import { ProjectType } from '../constants';
+import { ProjectType, fieldNames } from '../constants';
 import { useLatest } from '../hook';
+import { VARIATION_CONTAINER_ID } from '../AppPage/constants';
 
 const styles = {
   root: css({
@@ -51,7 +52,6 @@ const methods = (state) => {
     setInitialData({ 
       isFx, primaryEnvironment, experiments, contentTypes, referenceInfo 
     }) {
-      console.log('set init action');
       state.isFx = isFx;
       state.primaryEnvironment = primaryEnvironment;
       state.experiments = experiments;
@@ -63,29 +63,23 @@ const methods = (state) => {
       state.error = message;
     },
     setExperiment(experimentKey, environment) {
-      console.log('set experiment action');
       state.experimentKey = experimentKey;
       state.environment = environment;
       state.meta = {};
     },
     setVariations(variations) {
-      console.log('set variation action');
       state.variations = variations;
     },
     setEntry(id, entry) {
-      console.log('set entry action');
       state.entries[id] = entry;
     },
     setMeta(meta) {
-      console.log('set meta action');
       state.meta = meta;
     },
     setExperimentResults(id, results) {
-      console.log('set exp results action');
       state.experimentsResults[id] = results;
     },
     updateFxExperimentRule(key, envrionment, fxRule) {
-      console.log('update fx rule action');
       const index = state.experiments.findIndex(
         (experiment) => experiment.key === key && experiment.environment === envrionment
       );
@@ -108,7 +102,6 @@ const methods = (state) => {
     //   }
     // },
     updateExperiment(id, experiment) {
-      console.log('update exp action');
       const index = state.experiments.findIndex(
         (experiment) => experiment.id.toString() === id.toString()
       );
@@ -119,16 +112,34 @@ const methods = (state) => {
   };
 };
 
+const entryHasField = (entry, field) => {
+  return !!entry.fields[field];
+};
+
+const checkAndGetField = (entry, field) => {
+  if (entryHasField(entry, field)) {
+    return entry.fields[field].getValue();
+  }
+  return undefined;
+}
+
+const checkAndSetField = async (entry, field, value) => {
+  if (entryHasField(entry, field)) {
+    return entry.fields[field].setValue(value);
+  }
+}
+
 const getInitialValue = (sdk) => ({
   loaded: false,
+  isFx: false,
   error: false,
   experiments: [],
   contentTypes: [],
   meta: sdk.entry.fields.meta.getValue() || {},
   variations: sdk.entry.fields.variations.getValue() || [],
   experimentKey: sdk.entry.fields.experimentKey.getValue(),
-  environment: sdk.entry.fields.environment.getValue(),
-  flagKey: sdk.entry.fields.flagKey.getValue(),
+  environment: checkAndGetField(sdk.entry, fieldNames.environment),
+  flagKey: checkAndGetField(sdk.entry, fieldNames.flagKey),
   entries: {},
   experimentsResults: {},
 });
@@ -168,23 +179,18 @@ const getEntriesLinkedByIds = async (space, entryIds) => {
   return entriesRes;
 };
 
-
 // TODO: variation container might have missing fields if not reconfigured
 // TODO: installation param might have the projectType value missing
 // TODO: handle both cases
 const fetchInitialData = async (sdk, client) => {
-  console.log('fetching init ....');
   const { space, ids, locales, entry } = sdk;
-  const isNewEntry = !!sdk.entry.fields.experimentKey.getValue();
-  const entryHasEnvironment = !!sdk.entry.fields.environment.getValue()
 
-  console.log('entry: ', sdk.entry.fields.experimentId.getValue(), sdk.entry.fields.experimentKey.getValue());
   const { optimizelyProjectType, optimizelyProjectId } = sdk.parameters.installation;
 
   let fsToFxMigrated = false;
   let primaryEnvironment = '';
 
-  if (optimizelyProjectType === ProjectType.FullStack) {
+  if (optimizelyProjectType !== ProjectType.FeatureExperimentation) {
     const [project, environments] = await Promise.all([
       client.getProject(optimizelyProjectId),
       client.getProjectEnvironments(optimizelyProjectId),
@@ -197,26 +203,74 @@ const fetchInitialData = async (sdk, client) => {
         primaryEnvironment = e.key;
       }
     });
-
-    if (fsToFxMigrated && !isNewEntry && !entryHasEnvironment) {
-      await sdk.entry.fields.environment.setValue(primaryEnvironment);
-      await sdk.entry.save();
-    }
-    
-    console.log('project', project, primaryEnvironment); 
   }
 
-  console.log('after fetch jproject');
+  // update variation container content type if needed
+  if (fsToFxMigrated) {
+    const entryFields = Object.keys(entry.fields);
+    if (!entryFields.includes(fieldNames.flagKey) || !entryFields.includes(fieldNames.environment)) {
+      const variationContainer = await space.getContentType(VARIATION_CONTAINER_ID);
+      if (!entryFields.includes(fieldNames.flagKey)) {
+        variationContainer.fields.push(
+          {
+            id: 'flagKey',
+            name: 'Flag Key',
+            type: 'Symbol',
+          },
+        );
+      }
+      if (!entryFields.includes(fieldNames.environment)) {
+        variationContainer.fields.push(
+          {
+            id: 'environment',
+            name: 'Environment Key',
+            type: 'Symbol',
+          },
+        );
+      }
+      await space.updateContentType(variationContainer);
+      // this will refresh the page and sdk.entry in the new page will have all variation container fields
+      await sdk.navigator.openEntry(sdk.entry.getSys().id);
+    }
+  }
+
   const isFx = optimizelyProjectType === ProjectType.FeatureExperimentation || fsToFxMigrated;
 
   const [contentTypesRes, entriesRes, experiments] = await Promise.all([
     space.getContentTypes({ order: 'name', limit: 1000 }),
     getEntriesLinkedByIds(space, ids.entry),
-    optimizelyProjectType === ProjectType.FeatureExperimentation ? 
-      client.getRules() : client.getExperiments(),
+    isFx ? client.getRules() : client.getExperiments(),
   ]);
 
-  // await wait(10000);
+
+  const experimentKey = checkAndGetField(entry, fieldNames.experimentKey);
+  const isNewEntry = !!experimentKey
+
+  //update entry with environment and flagKey if needed
+  if (fsToFxMigrated && !isNewEntry) {
+    let environment = checkAndGetField(entry, fieldNames.environment);
+    let flagKey = checkAndGetField(entry, fieldNames.flagKey);
+
+    if (!environment) {
+      environment = primaryEnvironment;
+      const rule = experiments.find((e) => {
+        e.key === experimentKey && e.environment_key === environment;
+      });
+      flagKey = rule.flag_key;
+      await Promise.all([
+        entry.fields.environment.setValue(environment),
+        entry.fields.flagKey.setValue(flagKey),
+      ]);
+      await entry.save()
+    } else if (!flagKey){
+      const rule = experiments.find((e) => {
+        e.key === experimentKey && e.environment_key === environment;
+      });
+      const flagKey = rule.flag_key;
+      await entry.fields.environment.setValue(flagKey),
+      await entry.save();
+    }
+  }
 
   return {
     isFx,
@@ -250,15 +304,12 @@ export default function EditorPage(props) {
 
   const { isFx, primaryEnvironment, experimentKey, environment } = state;
 
-  console.log('state', state);
-
   const experiment = state.experiments.find(
     (experiment) => {
       if (!isFx) {
         return experiment.key === experimentKey;
       }
-      const env = environment || primaryEnvironment;
-      return experiment.key === experimentKey && experiment.environment === env;
+      return experiment.key === experimentKey && experiment.environment_key === (environment || primaryEnvironment);
     }
   );
   
@@ -418,7 +469,7 @@ export default function EditorPage(props) {
     // );
     const unsubsribeExperimentChange = props.sdk.entry.fields.experimentKey.onValueChanged(
       (data) => {
-        const envrionment = props.sdk.entry.fields.environment.getValue();
+        const environment = checkAndGetField(props.sdk.entry, fieldNames.environment);
         actions.setExperiment(data, environment);
       }
     );
@@ -426,7 +477,6 @@ export default function EditorPage(props) {
       actions.setVariations(data || []);
     });
     const unsubscribeMetaChange = props.sdk.entry.fields.meta.onValueChanged((data) => {
-      console.log('meta change .. ', data);
       actions.setMeta(data || {});
     });
     return () => {
@@ -488,6 +538,7 @@ export default function EditorPage(props) {
 
   const onChangeExperiment = (experiment) => {
     props.sdk.entry.fields.meta.setValue({});
+    checkAndSetField(props.sdk.entry, fieldNames.experiment.flag_key);
     props.sdk.entry.fields.flagKey.setValue(experiment.flag_key);
     props.sdk.entry.fields.environment.setValue(experiment.environment_key);
     const experimentId = (isFx ? experiment.ruleExperimentId : experiment.id) || '';
