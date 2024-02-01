@@ -98,6 +98,9 @@ export default class AppPage extends React.Component {
     );
 
     app.onConfigure(this.configureApp);
+    app.onConfigurationCompleted(() => {
+      this.props.sdk.navigator.
+    });
   }
 
   configureApp = async () => {
