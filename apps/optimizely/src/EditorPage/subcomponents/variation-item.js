@@ -149,7 +149,7 @@ export default function VariationItem(props) {
       {props.variation && (
         <React.Fragment>
           <Subheading className={styles.variationTitle}>
-            {variation.key} <small>({getPercentOfTraffic(isFxProject(sdk), variation)}% of traffic)</small>
+            {variation.key} <small>({getPercentOfTraffic(props.isFx, variation)}% of traffic)</small>
           </Subheading>
           {variation.description && (
             <Paragraph className={styles.variationDescription}>
@@ -191,6 +191,7 @@ export default function VariationItem(props) {
 }
 
 VariationItem.propTypes = {
+  isFx: PropTypes.bool,
   variation: PropTypes.object,
   experimentResults: PropTypes.object,
   sys: PropTypes.object,

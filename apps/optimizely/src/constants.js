@@ -5,6 +5,7 @@ export const ProjectType = {
 
 export const fieldNames = {
   experimentKey: 'experimentKey',
+  experimentId: 'experimentId',
   environment: 'environment',
   flagKey: 'flagKey',
 };
