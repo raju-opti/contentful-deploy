@@ -4,6 +4,8 @@ import { Button } from '@contentful/forma-36-react-components';
 import tokens from '@contentful/forma-36-tokens';
 import { css } from 'emotion';
 import { isFxProject } from '../util';
+import {  checkAndGetField, checkAndSetField } from '../util';
+import { ProjectType, fieldNames } from '../constants';
 
 const styles = {
   button: css({
@@ -36,15 +38,39 @@ const fetchProjectData = async (client, projectId) => {
 }
 
 export default function Sidebar(props) {
-  const [experimentId, setExperimentId] = useState(props.sdk.entry.fields.experimentId.getValue());
+  const { optimizelyProjectId, optimizelyProjectType } = props.sdk.parameters.installation;
+  const [projectType, setProjectType] = useState(null);
 
-  console.log('sidebar fields ...', props.sdk.entry.fields.experimentId.getValue(), props.sdk.entry.fields.flagKey.getValue())
-  const flagKey = props.sdk.entry.fields.flagKey.getValue();
-  // only used for FX project, the experimentKey field will have the key of the rule and the envrionment field will have the environment key
-  const ruleKey = props.sdk.entry.fields.experimentKey.getValue();
-  const environment = props.sdk.entry.fields.environment.getValue();
+  const [experimentKey, setExperimentKey] = useState(checkAndGetField(props.sdk.entry, fieldNames.experimentKey));
+  const experimentId = checkAndGetField(props.sdk.entry, fieldNames.experimentId);
+  const flagKey = checkAndGetField(props.sdk.entry, fieldNames.flagKey);
+  const environment = checkAndGetField(props.sdk.entry, fieldNames.environment);
 
-  const { parameters } = props.sdk;
+  useEffect(() => {
+    let isActive = true;
+    (async () => {
+      if (optimizelyProjectType === ProjectType.FeatureExperimentation) {
+        setProjectType(ProjectType.FeatureExperimentation);
+        return;
+      }
+
+      while(true) {
+        try {
+          const project = await props.client.getProject(optimizelyProjectId);
+          if (!isActive) return;
+          const type = project.is_flags_enabled ? ProjectType.FeatureExperimentation : ProjectType.FullStack;
+          setProjectType(type);
+          return;
+        } catch (err) {
+
+        }
+      }
+    })();
+
+    return () => {
+      isActive = false;
+    }
+  }, []);
 
   useEffect(() => {
     props.sdk.window.startAutoResizer();
@@ -54,15 +80,22 @@ export default function Sidebar(props) {
   }, [props.sdk.window]);
 
   useEffect(() => {
-    const unsubscribe = props.sdk.entry.fields.experimentId.onValueChanged((value) => {
-      setExperimentId(value);
+    const unsubscribe = props.sdk.entry.fields.experimentKey.onValueChanged((value) => {
+      setExperimentKey(value);
     });
     return () => {
       return unsubscribe();
     };
-  }, [props.sdk.entry.fields.experimentId]);
+  }, [props.sdk.entry.fields.experimentKey]);
 
-  const projectId = parameters.installation.optimizelyProjectId;
+  let disableViewButton = !projectType ||
+    (projectType === ProjectType.FullStack && !experimentKey) ||
+    (projectType === ProjectType.FeatureExperimentation && (!flagKey || !environment || !experimentKey));
+
+  let disableListButton = !projectType ||
+    (projectType === ProjectType.FeatureExperimentation && !environment);
+
+  const isFx = projectType === ProjectType.FeatureExperimentation;
 
   return (
     <div data-test-id="sidebar">
@@ -70,8 +103,8 @@ export default function Sidebar(props) {
         buttonType="primary"
         isFullWidth
         className={styles.button}
-        disabled={!experimentId}
-        href={isFxProject(props.sdk) ? getRuleEditUrl(projectId, flagKey, ruleKey, environment) : getExperimentUrl(projectId, experimentId)}
+        disabled={disableViewButton}
+        href={isFx ? getRuleEditUrl(optimizelyProjectId, flagKey, experimentKey, environment) : getExperimentUrl(optimizelyProjectId, experimentId)}
         target="_blank"
         data-test-id="view-experiment">
         View in Optimizely
@@ -80,11 +113,11 @@ export default function Sidebar(props) {
         buttonType="muted"
         isFullWidth
         className={styles.button}
-        disabled={isFxProject(props.sdk) && !experimentId}
+        disabled={disableListButton}
         target="_blank"
-        href={isFxProject(props.sdk) ? getAllFlagsUrl(projectId, environment) : getAllExperimentsUrl(projectId)}
+        href={isFx ? getAllFlagsUrl(optimizelyProjectId, environment) : getAllExperimentsUrl(optimizelyProjectId)}
         data-test-id="view-all">
-        <>{`View all ${isFxProject(props.sdk) ? 'flags' : 'experiments'}`}</>
+        <>{`View all ${isFx ? 'flags' : 'experiments'}`}</>
       </Button>
     </div>
   );

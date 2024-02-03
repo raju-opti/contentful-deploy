@@ -99,7 +99,7 @@ export default class AppPage extends React.Component {
 
     app.onConfigure(this.configureApp);
     app.onConfigurationCompleted(() => {
-      this.props.sdk.navigator.
+      this.props.sdk.navigator.openEntriesList();
     });
   }
 
@@ -249,7 +249,7 @@ export default class AppPage extends React.Component {
       variationContainer.fields.push(
         {
           id: 'flagId',
-          name: 'Flag Key',
+          name: 'Flag Id',
           type: 'Symbol',
         },
       );

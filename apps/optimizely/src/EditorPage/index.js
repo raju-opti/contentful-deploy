@@ -17,6 +17,7 @@ import ConnectButton from '../ConnectButton';
 import { ProjectType, fieldNames } from '../constants';
 import { useLatest } from '../hook';
 import { VARIATION_CONTAINER_ID } from '../AppPage/constants';
+import {  checkAndGetField, checkAndSetField } from '../util';
 
 const styles = {
   root: css({
@@ -37,12 +38,10 @@ const wait = (ms) => {
 
 const updatetFxRuleFields = (fxRule) => {
   const variations = fxRule.variations && Object.values(fxRule.variations);
-  const ruleExperimentId = fxRule.experiment_id;
   const campaignId = fxRule.layer_id;
   const status = fxRule.enabled ? 'enabled' : 'disabled';
 
   fxRule.variations = variations;
-  fxRule.ruleExperimentId = ruleExperimentId;
   fxRule.campaign_id = campaignId;
   fxRule.status = status;
 }
@@ -79,9 +78,9 @@ const methods = (state) => {
     setExperimentResults(id, results) {
       state.experimentsResults[id] = results;
     },
-    updateFxExperimentRule(key, envrionment, fxRule) {
+    updateFxExperimentRule(key, environment, fxRule) {
       const index = state.experiments.findIndex(
-        (experiment) => experiment.key === key && experiment.environment === envrionment
+        (experiment) => experiment.key === key && experiment.environment_key === environment
       );
       if (index !== -1) {
         const expriment = { ...state.experiments[index], ...fxRule };
@@ -89,18 +88,6 @@ const methods = (state) => {
         state.experiments[index] = expriment;
       }
     },
-    // setRuleDetails(id, status, variations, experimentId, campaignId) {
-    //   const index = state.experiments.findIndex(
-    //     (experiment) => experiment.id.toString() === id.toString()
-    //   );
-
-    //   if (index !== -1) {
-    //     state.experiments[index].variations = variations;
-    //     state.experiments[index].ruleExperimentId = experimentId;
-    //     state.experiments[index].campaign_id = campaignId;
-    //     state.experiments[index].status = status;
-    //   }
-    // },
     updateExperiment(id, experiment) {
       const index = state.experiments.findIndex(
         (experiment) => experiment.id.toString() === id.toString()
@@ -111,23 +98,6 @@ const methods = (state) => {
     },
   };
 };
-
-const entryHasField = (entry, field) => {
-  return !!entry.fields[field];
-};
-
-const checkAndGetField = (entry, field) => {
-  if (entryHasField(entry, field)) {
-    return entry.fields[field].getValue();
-  }
-  return undefined;
-}
-
-const checkAndSetField = async (entry, field, value) => {
-  if (entryHasField(entry, field)) {
-    return entry.fields[field].setValue(value);
-  }
-}
 
 const getInitialValue = (sdk) => ({
   loaded: false,
@@ -244,31 +214,29 @@ const fetchInitialData = async (sdk, client) => {
 
 
   const experimentKey = checkAndGetField(entry, fieldNames.experimentKey);
-  const isNewEntry = !!experimentKey
+  const isNewEntry = !experimentKey
 
+  console.log(isFx, isNewEntry);
   //update entry with environment and flagKey if needed
-  if (fsToFxMigrated && !isNewEntry) {
+  if (isFx && !isNewEntry) {
     let environment = checkAndGetField(entry, fieldNames.environment);
     let flagKey = checkAndGetField(entry, fieldNames.flagKey);
 
-    if (!environment) {
-      environment = primaryEnvironment;
-      const rule = experiments.find((e) => {
-        e.key === experimentKey && e.environment_key === environment;
-      });
-      flagKey = rule.flag_key;
-      await Promise.all([
-        entry.fields.environment.setValue(environment),
-        entry.fields.flagKey.setValue(flagKey),
-      ]);
-      await entry.save()
-    } else if (!flagKey){
-      const rule = experiments.find((e) => {
-        e.key === experimentKey && e.environment_key === environment;
-      });
-      const flagKey = rule.flag_key;
-      await entry.fields.environment.setValue(flagKey),
-      await entry.save();
+    console.log('env flagKey', environment, flagKey);
+
+    if (!environment || !flagKey) {
+      if (!environment) environment = primaryEnvironment;
+      const rule = experiments.find((e) => 
+        e.key === experimentKey && e.environment_key === environment
+      );
+
+      console.log(rule, environment, 'rulee');
+      if (rule) {
+        flagKey = rule.flag_key;
+        entry.fields.flagKey.setValue(flagKey);
+        entry.fields.environment.setValue(environment);
+        entry.fields.experimentKey.setValue(experimentKey);
+      }
     }
   }
 
@@ -303,17 +271,18 @@ export default function EditorPage(props) {
   // );
 
   const { isFx, primaryEnvironment, experimentKey, environment } = state;
+  const experimentEnvironment = environment || primaryEnvironment;
 
   const experiment = state.experiments.find(
     (experiment) => {
       if (!isFx) {
         return experiment.key === experimentKey;
       }
-      return experiment.key === experimentKey && experiment.environment_key === (environment || primaryEnvironment);
+      return experiment.key === experimentKey && experiment.environment_key === experimentEnvironment;
     }
   );
   
-  const experimentId = experiment && (isFx ? experiment.ruleExperimentId : experiment.id);
+  const experimentId = experiment && (isFx ? experiment.experiment_id : experiment.id);
 
   const getLatestClient = useLatest(props.client);
   const getLatestSdk = useLatest(props.sdk);
@@ -331,20 +300,19 @@ export default function EditorPage(props) {
     const client = getLatestClient();
 
     if (hasExperiment && isFx && !hasVariations) {
-      console.log('in effect ', flagKey, experimentKey, environment);
       client
-        .getRule(flagKey, experimentKey, environment)
+        .getRule(flagKey, experimentKey, experimentEnvironment)
         .then((rule) => {
           const sdk = getLatestSdk();
           // update experiment id field of the entry
           if (sdk.entry.fields.experimentKey.getValue() === experimentKey
-            && sdk.entry.fields.environment.getValue() === environment) {
-              return sdk.entry.fields.experimentId.setValue(rule.experiment_id).then(() => rule);
+            && (!sdk.entry.fields.environment.getValue() || sdk.entry.fields.environment.getValue() === experimentEnvironment)) {
+              return sdk.entry.fields.experimentId.setValue(rule.experiment_id.toString()).then(() => rule);
           }
           return rule;
         }).then((rule) => {
           if (isActive) {
-            actions.updateFxExperimentRule(experimentKey, environment, rule);
+            actions.updateFxExperimentRule(experimentKey, experimentEnvironment, rule);
           }
         })
         .catch((err) => {
@@ -359,7 +327,7 @@ export default function EditorPage(props) {
     hasExperiment,
     isFx,
     experimentKey,
-    environment,
+    experimentEnvironment,
     flagKey,
     hasVariations,
     getLatestClient,
@@ -374,12 +342,9 @@ export default function EditorPage(props) {
     fetchInitialData(props.sdk, props.client)
       .then((data) => {
         if (data.isFx) {
-          console.log('init fx project');
           data.experiments.forEach((experiment) => {
             updatetFxRuleFields(experiment);
           });
-        } else {
-          console.log('init fsss project');
         }
         actions.setInitialData(data);
         return data;
@@ -398,14 +363,13 @@ export default function EditorPage(props) {
     const interval = setInterval(() => {
       if (hasExperiment) {
         const client = getLatestClient();
-        const sdk = getLatestSdk();
 
         if (isFx) {
           client
-            .getRule(flagKey, experimentKey, environment)
+            .getRule(flagKey, experimentKey, experimentEnvironment)
             .then((rule) => {
               if (isActive) {
-                actions.updateFxExperimentRule(experimentKey, environment, rule);
+                actions.updateFxExperimentRule(experimentKey, experimentEnvironment, rule);
               }
             })
             .catch(() => {});
@@ -420,7 +384,7 @@ export default function EditorPage(props) {
             .catch(() => {});
         }        
       }
-    }, 50000);
+    }, 5000);
 
     return () => {
       clearInterval(interval);
@@ -430,11 +394,10 @@ export default function EditorPage(props) {
     hasExperiment,
     isFx,
     experimentKey,
-    environment,
+    experimentEnvironment,
     experimentId,
     flagKey,
     getLatestClient,
-    getLatestSdk,
     actions
   ]);  
 
@@ -486,10 +449,7 @@ export default function EditorPage(props) {
     };
   }, [
     actions,
-    props.sdk.entry.fields.experimentKey,
-    props.sdk.entry.fields.environment,
-    props.sdk.entry.fields.meta,
-    props.sdk.entry.fields.variations,
+    props.sdk.entry
   ]);
 
   const experimentName = experiment && experiment.name;
@@ -525,7 +485,7 @@ export default function EditorPage(props) {
       return undefined;
     }
 
-    const experimentId = isFx ? experiment.ruleExperimentId : experiment.id;
+    const experimentId = isFx ? experiment.experiment_id : experiment.id;
     return {
       url: props.client.getResultsUrl(experiment.campaign_id, experimentId),
       results: state.experimentsResults[experimentId],
@@ -538,11 +498,12 @@ export default function EditorPage(props) {
 
   const onChangeExperiment = (experiment) => {
     props.sdk.entry.fields.meta.setValue({});
-    checkAndSetField(props.sdk.entry, fieldNames.experiment.flag_key);
-    props.sdk.entry.fields.flagKey.setValue(experiment.flag_key);
-    props.sdk.entry.fields.environment.setValue(experiment.environment_key);
-    const experimentId = (isFx ? experiment.ruleExperimentId : experiment.id) || '';
-    props.sdk.entry.fields.experimentId.setValue(experimentId.toString());
+    checkAndSetField(props.sdk.entry, fieldNames.flagKey, experiment.flag_key);
+    checkAndSetField(props.sdk.entry, fieldNames.environment, experiment.environment_key);
+    const experimentId = (isFx ? experiment.experiment_id : experiment.id) || '';
+    if (experimentId) {
+      props.sdk.entry.fields.experimentId.setValue(experimentId.toString());
+    }
     // setting experiment key last, so subscribing to experiment id change ensures 
     // other fields are already up-to-date
     props.sdk.entry.fields.experimentKey.setValue(experiment.key);

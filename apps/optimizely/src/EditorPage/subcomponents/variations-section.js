@@ -102,6 +102,7 @@ export default function VariationsSection(props) {
       </Paragraph>
       {mappedVariations.map((item) => (
         <VariationItem
+          isFx={props.isFx}
           variation={item.variation}
           experimentResults={props.experimentResults}
           sys={item.sys}
