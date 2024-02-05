@@ -110,7 +110,7 @@ export default class AppPage extends React.Component {
       this.props.sdk.notifier.error(`You must be connected to Optimizely to configure the app.`);
       return false;
     }
-
+  
     const { config } = this.state;
 
     console.log('config is ', config);
@@ -281,7 +281,7 @@ export default class AppPage extends React.Component {
         omitted: true,
       });
     }
-    
+
     await this.props.sdk.space.updateContentType(variationContainer);
   };
 

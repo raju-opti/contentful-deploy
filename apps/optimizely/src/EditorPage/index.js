@@ -17,7 +17,7 @@ import ConnectButton from '../ConnectButton';
 import { ProjectType, fieldNames } from '../constants';
 import { useLatest } from '../hook';
 import { VARIATION_CONTAINER_ID } from '../AppPage/constants';
-import {  checkAndGetField, checkAndSetField, randStr } from '../util';
+import {  checkAndGetField, checkAndSetField, randStr, isCloseToExpiration } from '../util';
 
 const styles = {
   root: css({
@@ -264,10 +264,10 @@ const fetchInitialData = async (sdk, client) => {
   };
 };
 
-function isCloseToExpiration(expires) {
-  const _10minutes = 600000;
-  return parseInt(expires, 10) - Date.now() <= _10minutes;
-}
+// function isCloseToExpiration(expires) {
+//   const _10minutes = 600000;
+//   return parseInt(expires, 10) - Date.now() <= _10minutes;
+// }
 
 export default function EditorPage(props) {
   const globalState = useMethods(methods, getInitialValue(props.sdk));

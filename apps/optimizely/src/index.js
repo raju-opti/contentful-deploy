@@ -11,6 +11,7 @@ import AppPage from './AppPage';
 import '@contentful/forma-36-react-components/dist/styles.css';
 import '@contentful/forma-36-fcss/dist/styles.css';
 import 'whatwg-fetch';
+import { isCloseToExpiration } from './util';
 
 function parseHash(hash) {
   return hash
@@ -73,8 +74,10 @@ export default class App extends React.Component {
     const token = window.localStorage.getItem(TOKEN_KEY);
     const expires = window.localStorage.getItem(TOKEN_EXPIRATION);
 
+    console.log(expires, )
+
     this.state = {
-      client: token ? this.makeClient(token) : null,
+      client: token && !isCloseToExpiration(expires) ? this.makeClient(token) : null,
       accessToken: token,
       expires,
     };
