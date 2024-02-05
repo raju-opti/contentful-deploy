@@ -18,6 +18,7 @@ export default class OptimizelyClient {
       },
     });
 
+    console.log('rsponse ', this.accessToken, response);
     if (response.ok) {
       return await response.json();
     }
@@ -26,13 +27,14 @@ export default class OptimizelyClient {
     this.onReauth();
   };
 
-  _getItemsPerPage = async (item, isFx) => {
+  _getItemsPerPage = async (item) => {
     let items = [];
     const PER_PAGE = 100;
     const MAX_REQUESTS = 10;
 
     for (let i = 1; i <= MAX_REQUESTS; i++) {
       const results = await this.makeRequest(this._getItemsUrl(PER_PAGE, i, item));
+      console.log(results);
       items = [...items, ...results];
       if (results.length < PER_PAGE) {
         break;

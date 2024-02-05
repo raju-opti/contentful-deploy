@@ -28,3 +28,8 @@ export const checkAndSetField = async (entry, field, value) => {
 export const randStr = () => {
   return Math.random().toString(36).substring(2)
 }
+
+export function isCloseToExpiration(expires) {
+  const _10minutes = 600000;
+  return parseInt(expires, 10) - Date.now() <= _10minutes;
+}
