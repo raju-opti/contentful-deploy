@@ -132,6 +132,7 @@ export default class AppPage extends React.Component {
       const flagKeyField = variationContainerContentType.fields.find((f) => f.id === 'flagKey');
       const flagIdField = variationContainerContentType.fields.find((f) => f.id === 'flagId');
       const environmentField = variationContainerContentType.fields.find((f) => f.id === 'environment');
+      const revisionField = variationContainerContentType.fields.find((f) => f.id === 'revision');
 
       console.log(flagKeyField, flagIdField, environmentField);
 
@@ -141,6 +142,7 @@ export default class AppPage extends React.Component {
             addFlagKey: !flagIdField,
             addFlagId: !flagIdField,
             addEnvironment: !environmentField,
+            addRevision: !revisionField,
           }
         );
       }
@@ -226,6 +228,12 @@ export default class AppPage extends React.Component {
           name: 'Environment Key',
           type: 'Symbol',
         },
+        {
+          id: 'revision',
+          name: 'Revision ID',
+          type: 'Symbol',
+          omitted: true,
+        },
       ],
     });
 
@@ -234,7 +242,7 @@ export default class AppPage extends React.Component {
 
   updateVariationContainerContentType = async (variationContainer, opt) => {
     console.log('updating ', variationContainer, opt);
-    const { addFlagId, addFlagKey, addEnvironment } = opt;
+    const { addFlagId, addFlagKey, addEnvironment, addRevision } = opt;
     if (addFlagKey) {
       variationContainer.fields.push(
         {
@@ -264,6 +272,16 @@ export default class AppPage extends React.Component {
         },
       );
     }
+
+    if (addRevision) {
+      variationContainer.fields.push({
+        id: 'revision',
+        name: 'Revision ID',
+        type: 'Symbol',
+        omitted: true,
+      });
+    }
+    
     await this.props.sdk.space.updateContentType(variationContainer);
   };
 

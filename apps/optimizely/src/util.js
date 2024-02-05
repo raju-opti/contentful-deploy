@@ -24,3 +24,7 @@ export const checkAndSetField = async (entry, field, value) => {
     return entry.fields[field].setValue(value);
   }
 }
+
+export const randStr = () => {
+  return Math.random().toString(36).substring(2)
+}
