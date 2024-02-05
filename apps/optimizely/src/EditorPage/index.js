@@ -17,7 +17,7 @@ import ConnectButton from '../ConnectButton';
 import { ProjectType, fieldNames } from '../constants';
 import { useLatest } from '../hook';
 import { VARIATION_CONTAINER_ID } from '../AppPage/constants';
-import {  checkAndGetField, checkAndSetField } from '../util';
+import {  checkAndGetField, checkAndSetField, randStr } from '../util';
 
 const styles = {
   root: css({
@@ -178,7 +178,8 @@ const fetchInitialData = async (sdk, client) => {
   // update variation container content type if needed
   if (fsToFxMigrated) {
     const entryFields = Object.keys(entry.fields);
-    if (!entryFields.includes(fieldNames.flagKey) || !entryFields.includes(fieldNames.environment)) {
+    if (!entryFields.includes(fieldNames.flagKey) || !entryFields.includes(fieldNames.environment)
+        || !entryFields.includes(fieldNames.revision)) {
       const variationContainer = await space.getContentType(VARIATION_CONTAINER_ID);
       if (!entryFields.includes(fieldNames.flagKey)) {
         variationContainer.fields.push(
@@ -197,6 +198,15 @@ const fetchInitialData = async (sdk, client) => {
             type: 'Symbol',
           },
         );
+      }
+      
+      if (!entryFields.includes(fieldNames.revision)) {
+        variationContainer.fields.push({
+          id: 'revision',
+          name: 'Revision ID',
+          type: 'Symbol',
+          omitted: true,
+        });
       }
       await space.updateContentType(variationContainer);
       // this will refresh the page and sdk.entry in the new page will have all variation container fields
@@ -221,10 +231,9 @@ const fetchInitialData = async (sdk, client) => {
   if (isFx && !isNewEntry) {
     let environment = checkAndGetField(entry, fieldNames.environment);
     let flagKey = checkAndGetField(entry, fieldNames.flagKey);
+    let revision = checkAndGetField(entry, fieldNames.revision);
 
-    console.log('env flagKey', environment, flagKey);
-
-    if (!environment || !flagKey) {
+    if (!environment || !flagKey || !revision) {
       if (!environment) environment = primaryEnvironment;
       const rule = experiments.find((e) => 
         e.key === experimentKey && e.environment_key === environment
@@ -235,7 +244,7 @@ const fetchInitialData = async (sdk, client) => {
         flagKey = rule.flag_key;
         entry.fields.flagKey.setValue(flagKey);
         entry.fields.environment.setValue(environment);
-        entry.fields.experimentKey.setValue(experimentKey);
+        entry.fields.revision.setValue(randStr());
       }
     }
   }
@@ -504,9 +513,8 @@ export default function EditorPage(props) {
     if (experimentId) {
       props.sdk.entry.fields.experimentId.setValue(experimentId.toString());
     }
-    // setting experiment key last, so subscribing to experiment id change ensures 
-    // other fields are already up-to-date
     props.sdk.entry.fields.experimentKey.setValue(experiment.key);
+    checkAndSetField(props.sdk.entry, fieldNames.revision, randStr());
   };
 
   const onLinkVariation = async (variation) => {

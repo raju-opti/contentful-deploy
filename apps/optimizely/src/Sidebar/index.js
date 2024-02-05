@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useReducer } from 'react';
 import PropTypes from 'prop-types';
 import { Button } from '@contentful/forma-36-react-components';
 import tokens from '@contentful/forma-36-tokens';
@@ -41,7 +41,7 @@ export default function Sidebar(props) {
   const { optimizelyProjectId, optimizelyProjectType } = props.sdk.parameters.installation;
   const [projectType, setProjectType] = useState(null);
 
-  const [experimentKey, setExperimentKey] = useState(checkAndGetField(props.sdk.entry, fieldNames.experimentKey));
+  const experimentKey = checkAndGetField(props.sdk.entry, fieldNames.experimentKey);
   const experimentId = checkAndGetField(props.sdk.entry, fieldNames.experimentId);
   const flagKey = checkAndGetField(props.sdk.entry, fieldNames.flagKey);
   const environment = checkAndGetField(props.sdk.entry, fieldNames.environment);
@@ -79,14 +79,23 @@ export default function Sidebar(props) {
     };
   }, [props.sdk.window]);
 
+  const [, forceUpdate] = useReducer(x => x + 1, 0);
+
   useEffect(() => {
-    const unsubscribe = props.sdk.entry.fields.experimentKey.onValueChanged((value) => {
-      setExperimentKey(value);
-    });
+    let unsubscribe = () => {};
+    if (isFx && props.sdk.entry.fields.revision) {
+      unsubscribe = props.sdk.entry.fields.revision.onValueChanged(() => {
+        forceUpdate()
+      });
+    } else if (!isFx) {
+      unsubscribe = props.sdk.entry.fields.experimentKey.onValueChanged(() => {
+        forceUpdate()
+      });
+    }
     return () => {
       return unsubscribe();
     };
-  }, [props.sdk.entry.fields.experimentKey]);
+  }, [props.sdk.entry, forceUpdate]);
 
   let disableViewButton = !projectType ||
     (projectType === ProjectType.FullStack && !experimentKey) ||

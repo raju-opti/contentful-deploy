@@ -8,4 +8,5 @@ export const fieldNames = {
   experimentId: 'experimentId',
   environment: 'environment',
   flagKey: 'flagKey',
+  revision: 'revision',
 };
