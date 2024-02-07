@@ -103,6 +103,7 @@ export default function VariationsSection(props) {
       {mappedVariations.map((item) => (
         <VariationItem
           isFx={props.isFx}
+          disableEdit={props.disableEdit}
           variation={item.variation}
           experimentResults={props.experimentResults}
           sys={item.sys}
@@ -123,6 +124,7 @@ export default function VariationsSection(props) {
             <VariationItem
               sys={item.sys}
               key={item.sys.id}
+              disableEdit={props.disableEdit}
               onOpenEntry={props.onOpenEntry}
               onRemoveVariation={props.onRemoveVariation}
             />
@@ -136,6 +138,7 @@ export default function VariationsSection(props) {
 VariationsSection.propTypes = {
   loaded: PropTypes.bool.isRequired,
   isFx: PropTypes.bool.isRequired,
+  disableEdit: PropTypes.bool.isRequired,
   experiment: ExperimentType,
   experimentResults: PropTypes.object,
   meta: PropTypes.object.isRequired,

@@ -96,7 +96,7 @@ export default function ExperimentSection(props) {
           </React.Fragment>
         )}
       </SelectField>
-      {props.hasVariations === true && (
+      {props.hasVariations === true && !props.reloadNeeded && (
         <Paragraph className={styles.clearDescription}>
           To change experiment, first{' '}
           <TextLink onClick={props.onClearVariations}>clear the content assigned</TextLink>.

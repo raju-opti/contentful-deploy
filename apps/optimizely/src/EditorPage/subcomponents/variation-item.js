@@ -125,8 +125,8 @@ export function SelectedReference(props) {
       contentType={entry.meta.contentType}
       dropdownListElements={
         <DropdownList>
-          <DropdownListItem onClick={props.onEditClick}>Edit</DropdownListItem>
-          <DropdownListItem onClick={props.onRemoveClick}>Remove</DropdownListItem>
+          <DropdownListItem isDisabled={props.disableEdit} onClick={props.onEditClick}>Edit</DropdownListItem>
+          <DropdownListItem isDisabled={props.disableEdit} onClick={props.onRemoveClick}>Remove</DropdownListItem>
         </DropdownList>
       }
     />
@@ -135,6 +135,7 @@ export function SelectedReference(props) {
 
 SelectedReference.propTypes = {
   sys: PropTypes.object.isRequired,
+  disableEdit: PropTypes.bool.isRequired,
   onEditClick: PropTypes.func.isRequired,
   onRemoveClick: PropTypes.func.isRequired,
 };
@@ -161,6 +162,7 @@ export default function VariationItem(props) {
       {props.sys && (
         <SelectedReference
           sys={props.sys}
+          disableEdit={props.disableEdit}
           onEditClick={() => {
             props.onOpenEntry(props.sys.id);
           }}
@@ -177,6 +179,7 @@ export default function VariationItem(props) {
       )}
       {!props.sys && (
         <VariationSelect
+          disableEdit={props.disableEdit}
           onCreate={(contentType) => {
             props.onCreateVariation(props.variation, contentType);
           }}
