@@ -83,11 +83,11 @@ export default function Sidebar(props) {
 
   useEffect(() => {
     let unsubscribe = () => {};
-    if (isFx && props.sdk.entry.fields.revision) {
+    if (props.sdk.entry.fields.revision) {
       unsubscribe = props.sdk.entry.fields.revision.onValueChanged(() => {
         forceUpdate()
       });
-    } else if (!isFx) {
+    } else {
       unsubscribe = props.sdk.entry.fields.experimentKey.onValueChanged(() => {
         forceUpdate()
       });
