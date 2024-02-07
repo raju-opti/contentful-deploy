@@ -49,9 +49,10 @@ const updatetFxRuleFields = (fxRule) => {
 const methods = (state) => {
   return {
     setInitialData({ 
-      isFx, primaryEnvironment, experiments, contentTypes, referenceInfo 
+      isFx, reloadNeeded, primaryEnvironment, experiments, contentTypes, referenceInfo 
     }) {
       state.isFx = isFx;
+      state.reloadNeeded = reloadNeeded;
       state.primaryEnvironment = primaryEnvironment;
       state.experiments = experiments;
       state.contentTypes = contentTypes;
@@ -102,6 +103,7 @@ const methods = (state) => {
 const getInitialValue = (sdk) => ({
   loaded: false,
   isFx: false,
+  reloadNeeded: false,
   error: false,
   experiments: [],
   contentTypes: [],
@@ -181,7 +183,12 @@ const fetchInitialData = async (sdk, client) => {
     if (!entryFields.includes(fieldNames.flagKey) || !entryFields.includes(fieldNames.environment)
         || !entryFields.includes(fieldNames.revision)) {
       const variationContainer = await space.getContentType(VARIATION_CONTAINER_ID);
-      if (!entryFields.includes(fieldNames.flagKey)) {
+      const variationContainerFields = variationContainer.fields.map((f) => f.id);
+
+      let updateNeeded = false;
+
+      if (!variationContainerFields.includes(fieldNames.flagKey)) {
+        updateNeeded = true;
         variationContainer.fields.push(
           {
             id: 'flagKey',
@@ -190,7 +197,8 @@ const fetchInitialData = async (sdk, client) => {
           },
         );
       }
-      if (!entryFields.includes(fieldNames.environment)) {
+      if (!variationContainerFields.includes(fieldNames.environment)) {
+        updateNeeded = true;
         variationContainer.fields.push(
           {
             id: 'environment',
@@ -200,7 +208,8 @@ const fetchInitialData = async (sdk, client) => {
         );
       }
       
-      if (!entryFields.includes(fieldNames.revision)) {
+      if (!variationContainerFields.includes(fieldNames.revision)) {
+        updateNeeded = true;
         variationContainer.fields.push({
           id: 'revision',
           name: 'Revision ID',
@@ -208,8 +217,13 @@ const fetchInitialData = async (sdk, client) => {
           omitted: true,
         });
       }
-      await space.updateContentType(variationContainer);
-      // this will refresh the page and sdk.entry in the new page will have all variation container fields
+
+      if (updateNeeded) {
+        console.log('updating variation container');
+        await space.updateContentType(variationContainer);
+      }
+
+      console.log('reopening entry');
       await sdk.navigator.openEntry(sdk.entry.getSys().id);
     }
   }
@@ -226,31 +240,50 @@ const fetchInitialData = async (sdk, client) => {
   const experimentKey = checkAndGetField(entry, fieldNames.experimentKey);
   const isNewEntry = !experimentKey
 
-  console.log(isFx, isNewEntry);
+  const entryFields = Object.keys(entry.fields);
+  let reloadNeeded = !entryFields.includes(fieldNames.flagKey) || !entryFields.includes(fieldNames.environment)
+    || !entryFields.includes(fieldNames.revision);
+
   //update entry with environment and flagKey if needed
-  if (isFx && !isNewEntry) {
-    let environment = checkAndGetField(entry, fieldNames.environment);
-    let flagKey = checkAndGetField(entry, fieldNames.flagKey);
-    let revision = checkAndGetField(entry, fieldNames.revision);
+  if (isFx) {
+    console.log('reload needed ...', reloadNeeded);
+    if (reloadNeeded) {
+        sdk.dialogs.openAlert({
+          title: 'Action Required',
+          confirmLabel: 'Close',
+          message: 'This project has been migrated to Feature Experimentation. Please refresh the page to load the updated configuration!',
+        });
+    }
 
-    if (!environment || !flagKey || !revision) {
-      if (!environment) environment = primaryEnvironment;
-      const rule = experiments.find((e) => 
-        e.key === experimentKey && e.environment_key === environment
-      );
+    if (!isNewEntry && !reloadNeeded) {
+      let environment = checkAndGetField(entry, fieldNames.environment);
+      let flagKey = checkAndGetField(entry, fieldNames.flagKey);
+      let revision = checkAndGetField(entry, fieldNames.revision);
+      
+      console.log('values : ', environment, flagKey, revision);
 
-      console.log(rule, environment, 'rulee');
-      if (rule) {
-        flagKey = rule.flag_key;
-        entry.fields.flagKey.setValue(flagKey);
-        entry.fields.environment.setValue(environment);
-        entry.fields.revision.setValue(randStr());
+      if (!environment || !flagKey || !revision) {
+        if (!environment) environment = primaryEnvironment;
+        const rule = experiments.find((e) => 
+          e.key === experimentKey && e.environment_key === environment
+        );
+  
+        if (rule) {
+          console.log('got rule', rule.flag_key);
+          flagKey = rule.flag_key;
+          entry.fields.flagKey.setValue(flagKey);
+          entry.fields.environment.setValue(environment);
+          entry.fields.revision.setValue(randStr());
+        } else {
+          console.log('rule not found', environment, experimentKey);
+        }
       }
     }
   }
 
   return {
     isFx,
+    reloadNeeded,
     primaryEnvironment,
     experiments,
     contentTypes: contentTypesRes.items,
@@ -279,7 +312,7 @@ export default function EditorPage(props) {
   //   (experiment) => experiment.id.toString() === state.selectedId
   // );
 
-  const { isFx, primaryEnvironment, experimentKey, environment } = state;
+  const { isFx, reloadNeeded, primaryEnvironment, experimentKey, environment } = state;
   const experimentEnvironment = environment || primaryEnvironment;
 
   const experiment = state.experiments.find(
@@ -637,7 +670,8 @@ export default function EditorPage(props) {
           <SectionSplitter />
           <ExperimentSection
             loaded={state.loaded}
-            disabled={experiment && state.variations.length > 0}
+            reloadNeeded={state.reloadNeeded}
+            hasVariations={experiment && state.variations.length > 0}
             sdk={props.sdk}
             isFx={state.isFx}
             experiments={state.experiments}

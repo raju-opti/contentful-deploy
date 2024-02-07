@@ -80,7 +80,7 @@ export default function ExperimentSection(props) {
         }}
         selectProps={{
           width: 'large',
-          isDisabled: props.disabled === true || props.loaded === false,
+          isDisabled: props.hasVariations === true || props.loaded === false || props.reloadNeeded === true,
         }}
         id="experiment"
         name="experiment">
@@ -96,7 +96,7 @@ export default function ExperimentSection(props) {
           </React.Fragment>
         )}
       </SelectField>
-      {props.disabled === true && (
+      {props.hasVariations === true && (
         <Paragraph className={styles.clearDescription}>
           To change experiment, first{' '}
           <TextLink onClick={props.onClearVariations}>clear the content assigned</TextLink>.
@@ -113,7 +113,8 @@ export default function ExperimentSection(props) {
 
 ExperimentSection.propTypes = {
   loaded: PropTypes.bool.isRequired,
-  disabled: PropTypes.bool,
+  reloadNeeded: PropTypes.bool,
+  hasVariations: PropTypes.bool,
   sdk: PropTypes.object.isRequired,
   isFx: PropTypes.bool.isRequired,
   experiment: ExperimentType,
