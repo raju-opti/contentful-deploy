@@ -251,7 +251,8 @@ const fetchInitialData = async (sdk, client) => {
         sdk.dialogs.openAlert({
           title: 'Action Required',
           confirmLabel: 'Close',
-          message: 'This project has been migrated to Feature Experimentation. Please refresh the page to load the updated configuration!',
+          message: 'This project has been migrated to Feature Experimentation. Please refresh the page to load the updated configuration' + 
+            ' and continue editing!',
         });
     }
 
@@ -683,6 +684,7 @@ export default function EditorPage(props) {
           <VariationsSection
             loaded={state.loaded}
             isFx={isFx}
+            disableEdit={state.reloadNeeded}
             contentTypes={state.contentTypes}
             experiment={experiment}
             experimentResults={getExperimentResults(experiment)}
