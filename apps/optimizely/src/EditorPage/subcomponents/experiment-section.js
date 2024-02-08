@@ -40,7 +40,7 @@ export default function ExperimentSection(props) {
         const ruleKey = experiment.name || experiment.key;
         const environment = experiment.environment_key;
         const onOff = experiment.enabled ? 'on' : 'off';
-        const displayName = `${ruleKey} (flag: ${flagName}, envrionment: ${environment}, ${onOff})`
+        const displayName = `${ruleKey} (flag: ${flagName}, environment: ${environment}, ${onOff})`
 
         displayNames.set(experiment.id.toString(), displayName);
       } else {
