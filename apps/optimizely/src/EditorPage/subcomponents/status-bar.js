@@ -55,14 +55,14 @@ function StatusSeparator() {
   return <Icon className={styles.itemSeparator} icon="ChevronRight" size="small" color="muted" />;
 }
 
-const checkStatuses = (statuses, experiment, variations, entries, sdk) => {
+const checkStatuses = (statuses, experiment, variations, entries, isFx) => {
   if (!experiment) {
     return statuses;
   }
 
   statuses[Status.SelectExperiment] = true;
 
-  const isRunning = isFxProject(sdk) ? experiment.enabled : experiment.status === 'running';
+  const isRunning = isFx ? experiment.enabled : experiment.status === 'running';
   statuses[Status.StartExperiment] = isRunning;
 
   if (variations && experiment.variations) {
@@ -95,7 +95,7 @@ export default function StatusBar(props) {
   };
 
   if (props.loaded) {
-    statuses = checkStatuses(statuses, props.experiment, props.variations, props.entries, props.sdk);
+    statuses = checkStatuses(statuses, props.experiment, props.variations, props.entries, props.isFx);
   }
 
   return (
@@ -112,6 +112,7 @@ export default function StatusBar(props) {
 }
 
 StatusBar.propTypes = {
+  isFx: PropTypes.bool.isRequired,
   loaded: PropTypes.bool.isRequired,
   experiment: PropTypes.object,
   variations: PropTypes.array,
