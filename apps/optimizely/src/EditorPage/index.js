@@ -241,8 +241,8 @@ const fetchInitialData = async (sdk, client) => {
   const isNewEntry = !experimentKey
 
   const entryFields = Object.keys(entry.fields);
-  let reloadNeeded = !entryFields.includes(fieldNames.flagKey) || !entryFields.includes(fieldNames.environment)
-    || !entryFields.includes(fieldNames.revision);
+  let reloadNeeded = isFx && (!entryFields.includes(fieldNames.flagKey) || !entryFields.includes(fieldNames.environment)
+    || !entryFields.includes(fieldNames.revision));
 
   //update entry with environment and flagKey if needed
   if (isFx) {
@@ -648,6 +648,7 @@ export default function EditorPage(props) {
         </Modal>
         <div className={styles.root} data-test-id="editor-page">
           <StatusBar
+            isFx={isFx}
             loaded={state.loaded}
             experiment={experiment}
             variations={state.variations}
