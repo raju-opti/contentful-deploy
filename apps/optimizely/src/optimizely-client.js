@@ -4,6 +4,7 @@ export default class OptimizelyClient {
       throw new Error('You must provide a valid access token!');
     }
 
+    this.expires = Date.now() + 1 * 60 * 1000;
     this.accessToken = accessToken;
     this.project = project;
     this.baseURL = 'https://api.optimizely.com/v2';
@@ -24,6 +25,7 @@ export default class OptimizelyClient {
 
     // reauthing should hopefully fix the issue
     this.onReauth();
+    return Promise.reject(new Error(`request failed for url: ${url} with status: ${response.status}`));
   };
 
   _getItemsPerPage = async (item) => {
@@ -122,8 +124,8 @@ export default class OptimizelyClient {
   getExperimentResults = (experimentId) => {
     return this.makeRequest(`${this.baseURL}/experiments/${experimentId}/results`);
   };
-
-  getResultsUrl = (campaignUrl, experimentId) => {
-    return `https://app.optimizely.com/v2/projects/${this.project}/results/${campaignUrl}/experiments/${experimentId}`;
-  };
 }
+
+export const getResultsUrl = (projectId, campaignUrl, experimentId) => {
+  return `https://app.optimizely.com/v2/projects/${projectId}/results/${campaignUrl}/experiments/${experimentId}`;
+};

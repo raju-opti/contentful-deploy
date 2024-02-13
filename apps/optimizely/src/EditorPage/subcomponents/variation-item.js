@@ -16,7 +16,6 @@ import { SDKContext, GlobalStateContext } from './all-context';
 import VariationSelect from './variation-select';
 import VariationStats from './variations-stats';
 import { getAdditionalEntryInformation } from './utils';
-import { isFxProject } from '../../util';
 
 const styles = {
   variationContainer: css({
@@ -47,10 +46,10 @@ const styles = {
 
 function getPercentOfTraffic(isFxProject, variation) {
   if (isFxProject) {
-    return Math.floor(variation.percentage_included / 100);
+    return (variation.percentage_included / 100.0).toFixed(2);
   }
 
-  return Math.floor(variation.weight) / 100;
+  return (variation.weight / 100.0).toFixed(2);
 }
 
 function useEntryCard(id) {
@@ -141,8 +140,6 @@ SelectedReference.propTypes = {
 };
 
 export default function VariationItem(props) {
-  const sdk = useContext(SDKContext);
-
   const variation = props.variation;
 
   return (
