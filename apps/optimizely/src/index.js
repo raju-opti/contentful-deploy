@@ -52,6 +52,7 @@ const url = `https://app.optimizely.com/oauth2/authorize
 
 const TOKEN_KEY = 'optToken';
 const TOKEN_EXPIRATION = 'optExpire';
+const OPTI_CREDENTIALS = 'optCred';
 
 export default class App extends React.Component {
   static propTypes = {
@@ -71,8 +72,19 @@ export default class App extends React.Component {
   constructor(props) {
     super(props);
 
-    const token = window.localStorage.getItem(TOKEN_KEY);
-    const expires = window.localStorage.getItem(TOKEN_EXPIRATION);
+    let token, expires;
+    const credentials = window.localStorage.getItem(OPTI_CREDENTIALS);
+    if (credentials) {
+      const parsed = JSON.parse(credentials);
+      token = parsed[TOKEN_KEY];
+      expires = parsed[TOKEN_EXPIRATION];
+    } else {
+      token = window.localStorage.getItem(TOKEN_KEY);
+      expires = window.localStorage.getItem(TOKEN_EXPIRATION);
+    }
+    if (!expires) {
+      expires = '0';
+    }
 
     this.state = {
       client: token && !isCloseToExpiration(expires) ? this.makeClient(token) : null,
@@ -80,31 +92,39 @@ export default class App extends React.Component {
       expires,
     };
 
+    window.addEventListener('storage', (e) => {
+      if (e.key === OPTI_CREDENTIALS) {
+        const value = e.newValue;
+        if (value) {
+          const parsed = JSON.parse(value);
+          const token = parsed[TOKEN_KEY];
+          const expires = parsed[TOKEN_EXPIRATION];
+
+          this.setState({ client: this.makeClient(token), accessToken: token, expires });
+        }
+      }
+    });
+
     this.listener = window.addEventListener(
       'message',
       (event) => {
         const { data, origin } = event;
         const { token, expires } = data;
-
-        // if (`${origin}${window.location.pathname}` !== HOST || !token) {
-        //   return;
-        // }
         
         if (`${origin}${window.location.pathname}` !== redirectUrl || !token) {
           return;
         }
-        
-        window.localStorage.setItem(TOKEN_KEY, token);
-        window.localStorage.setItem(TOKEN_EXPIRATION, expires);
-        this.setState({ client: this.makeClient(data.token), accessToken: token, expires });
+
+        const credential = {
+          [TOKEN_KEY]: token,
+          [TOKEN_EXPIRATION] : expires,
+        };
+
+        window.localStorage.setItem(OPTI_CREDENTIALS, JSON.stringify(credential));
+        this.setState({ client: this.makeClient(token), accessToken: token, expires });
       },
       false
     );
-    // setTimeout(() => {
-    //   const token = window.localStorage.getItem(TOKEN_KEY);
-    //   const expires = window.localStorage.getItem(TOKEN_EXPIRATION);
-    //   this.setState({ client: this.makeClient(token), accessToken: token, expires });
-    // }, 10000);
   }
 
   makeClient = (token) => {
@@ -120,8 +140,6 @@ export default class App extends React.Component {
   openAuth = () => {
     const WINDOW_OPTS = 'left=150,top=150,width=700,height=700';
     window.open(url, '', WINDOW_OPTS);
-    // window.localStorage.setItem(TOKEN_KEY, '2:Ya2JGrejBI3pV0DLeme4DNKSIzmoIdv57hhOi0dj8LY7lroOjuPQ');
-    // window.localStorage.setItem(TOKEN_EXPIRATION, 100000000);
   };
 
   render() {
@@ -156,8 +174,6 @@ export default class App extends React.Component {
         return <IncorrectContentType sdk={sdk} missingFields={missingFields} />;
       }
 
-      console.log(sdk.parameters.installation);
-      
       return (
         <EditorPage
           sdk={sdk}

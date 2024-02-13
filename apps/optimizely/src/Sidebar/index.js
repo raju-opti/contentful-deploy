@@ -3,9 +3,9 @@ import PropTypes from 'prop-types';
 import { Button } from '@contentful/forma-36-react-components';
 import tokens from '@contentful/forma-36-tokens';
 import { css } from 'emotion';
-import { isFxProject } from '../util';
-import {  checkAndGetField, checkAndSetField } from '../util';
+import {  checkAndGetField } from '../util';
 import { ProjectType, fieldNames } from '../constants';
+import { wait } from '@testing-library/react';
 
 const styles = {
   button: css({
@@ -13,9 +13,6 @@ const styles = {
   }),
 };
 
-const getFlagUrl = (projectId, flagKey) => {
-  return `https://app.optimizely.com/v2/projects/${projectId}/flags/manage/${flagKey}/rules/production`;
-};
 
 const getRuleEditUrl = (projectId, flagKey, ruleKey, environment) => {
   return `https://app.optimizely.com/v2/projects/${projectId}/flags/manage/${flagKey}/rules/${environment}/edit/${ruleKey}`;
@@ -33,12 +30,8 @@ const getAllExperimentsUrl = (projectId) => {
   return `https://app.optimizely.com/v2/projects/${projectId}/experiments`;
 };
 
-const fetchProjectData = async (client, projectId) => {
-  
-}
-
 export default function Sidebar(props) {
-  const { optimizelyProjectId, optimizelyProjectType } = props.sdk.parameters.installation;
+  const { optimizelyProjectId } = props.sdk.parameters.installation;
   const [projectType, setProjectType] = useState(null);
 
   const experimentKey = checkAndGetField(props.sdk.entry, fieldNames.experimentKey);
@@ -48,13 +41,19 @@ export default function Sidebar(props) {
 
   useEffect(() => {
     let isActive = true;
-    (async () => {
+
+    if (projectType !== null) {
+      return;
+    }
+
+    const fetchProjectData = async () => {
+      const { optimizelyProjectId, optimizelyProjectType } = props.sdk.parameters.installation;
       if (optimizelyProjectType === ProjectType.FeatureExperimentation) {
         setProjectType(ProjectType.FeatureExperimentation);
         return;
       }
 
-      while(true) {
+      while(isActive && props.client) {
         try {
           const project = await props.client.getProject(optimizelyProjectId);
           if (!isActive) return;
@@ -62,15 +61,16 @@ export default function Sidebar(props) {
           setProjectType(type);
           return;
         } catch (err) {
-
+          await wait(1000);
         }
       }
-    })();
+    };
+    fetchProjectData();
 
     return () => {
       isActive = false;
     }
-  }, []);
+  }, [props.client, props.sdk, projectType]);
 
   useEffect(() => {
     props.sdk.window.startAutoResizer();
@@ -84,11 +84,11 @@ export default function Sidebar(props) {
   useEffect(() => {
     let unsubscribe = () => {};
     if (props.sdk.entry.fields.revision) {
-      unsubscribe = props.sdk.entry.fields.revision.onValueChanged(() => {
+      unsubscribe = props.sdk.entry.fields.revision.onValueChanged((v) => {
         forceUpdate()
       });
     } else {
-      unsubscribe = props.sdk.entry.fields.experimentKey.onValueChanged(() => {
+      unsubscribe = props.sdk.entry.fields.experimentKey.onValueChanged((v) => {
         forceUpdate()
       });
     }
@@ -146,5 +146,5 @@ Sidebar.propTypes = {
       }),
     }),
   }).isRequired,
-  client: PropTypes.any.isRequired,
+  client: PropTypes.any,
 };
