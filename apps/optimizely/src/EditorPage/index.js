@@ -196,23 +196,34 @@ const fetchInitialData = async (sdk, client, slideInLevelPromise) => {
 
   const { optimizelyProjectType, optimizelyProjectId } = sdk.parameters.installation;
 
-  let fsToFxMigrated = false;
-  let primaryEnvironment = '';
-
-  if (optimizelyProjectType !== ProjectType.FeatureExperimentation) {
-    const [project, environments] = await Promise.all([
-      client.getProject(optimizelyProjectId),
-      client.getProjectEnvironments(optimizelyProjectId),
-    ]);
-    if (project.is_flags_enabled) {
-      fsToFxMigrated = true;
+  const fetchFsToFxMigrated = async () => {
+    if (optimizelyProjectType === ProjectType.FeatureExperimentation) {
+      return false;
     }
-    environments.forEach((e) => {
+    const project = await client.getProject(optimizelyProjectId);
+    return project.is_flags_enabled;
+  }
+
+  const fetchPrimaryEnvironment = async () => {
+    // if entry alread has environment value, we don't need primary environment value
+    if (checkAndGetField(entry, fieldNames.environment)) {
+      return undefined;
+    }
+    const envs = await client.getProjectEnvironments(optimizelyProjectId);
+    let primary = '';
+    envs.forEach((e) => {
       if (e.is_primary) {
-        primaryEnvironment = e.key;
+        primary = e.key;
       }
     });
+
+    return primary;
   }
+
+  let [fsToFxMigrated, primaryEnvironment] = await Promise.all([
+    fetchFsToFxMigrated(),
+    fetchPrimaryEnvironment(),
+  ]);
 
   // handle fs to fx migartion
   // update variation container content type if needed and reload entry editor page if possible
@@ -296,7 +307,7 @@ const fetchInitialData = async (sdk, client, slideInLevelPromise) => {
   };
 };
 
-export default function EditorPage(props) {  
+export default function EditorPage(props) { 
   const globalState = useMethods(methods, getInitialValue(props.sdk));
   const [state, actions] = globalState;
   const [showAuth, setShowAuth] = useState(isCloseToExpiration(props.expires));
