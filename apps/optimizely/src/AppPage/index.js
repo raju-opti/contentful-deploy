@@ -6,8 +6,8 @@ import { Heading, Typography, Paragraph } from '@contentful/forma-36-react-compo
 
 import Connect from './Connect';
 import Config from './Config';
-import OptimizelyLogo from './OptimizelyLogo';
-// import OptimizelyLogo from '../optimizely-logo';
+// import OptimizelyLogo from './OptimizelyLogo';
+import OptimizelyLogo from '../optimizely-logo';
 import SectionSplitter from '../EditorPage/subcomponents/section-splitter';
 import { VARIATION_CONTAINER_ID } from './constants';
 

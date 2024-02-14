@@ -3,7 +3,8 @@ import React from "react";
 const OptimizelyLogo = (props) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 149.81 148.48"
+    // viewBox="0 0 149.81 148.48"
+    viewBox="0 0 150 150"
     {...props}
   >
     <path
