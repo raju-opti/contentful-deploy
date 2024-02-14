@@ -10,6 +10,7 @@ import Config from './Config';
 import OptimizelyLogo from '../optimizely-logo';
 import SectionSplitter from '../EditorPage/subcomponents/section-splitter';
 import { VARIATION_CONTAINER_ID } from './constants';
+import { colors } from '../constants';
 
 const styles = {
   body: css({
@@ -393,7 +394,7 @@ export default class AppPage extends React.Component {
           )}
         </div>
         <div className={styles.logo}>
-          <OptimizelyLogo width={60} height={60}/>
+          <OptimizelyLogo width={60} height={60} arcColor={colors.optimizelyBlue}/>
         </div>
       </>
     );

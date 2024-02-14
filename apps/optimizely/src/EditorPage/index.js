@@ -297,6 +297,8 @@ const fetchInitialData = async (sdk, client, slideInLevelPromise) => {
 };
 
 export default function EditorPage(props) {
+  console.log('params: ', props.sdk.parameters.installation);
+
   const globalState = useMethods(methods, getInitialValue(props.sdk));
   const [state, actions] = globalState;
   const [showAuth, setShowAuth] = useState(isCloseToExpiration(props.expires));

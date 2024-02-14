@@ -10,3 +10,8 @@ export const fieldNames = {
   flagKey: 'flagKey',
   revision: 'revision',
 };
+
+export const colors = {
+  optimizelyBlue: '#0037FF',
+  white: '#FFFFFF',
+};
