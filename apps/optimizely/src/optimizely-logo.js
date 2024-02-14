@@ -16,7 +16,7 @@ const OptimizelyLogo = (props) => (
     <path
       d="M50.29 130.16a31.43 31.43 0 0 1 0-62.85V49.76a49 49 0 0 0-.14 98h.14Z"
       style={{
-        fill: "#0037ff",
+        fill: props.arcColor,
       }}
     />
     <path
