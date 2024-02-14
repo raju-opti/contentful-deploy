@@ -394,7 +394,7 @@ export default class AppPage extends React.Component {
           )}
         </div>
         <div className={styles.logo}>
-          <OptimizelyLogo width={60} height={60} arcColor={colors.optimizelyBlue}/>
+          <OptimizelyLogo width={60} height={60} arccolor={colors.optimizelyBlue}/>
         </div>
       </>
     );
