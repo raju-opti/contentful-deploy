@@ -236,6 +236,7 @@ exports[`AppPage should render the AppPage loading when first connected to Optim
     class="css-fngmsh"
   >
     <svg
+      arccolor="#0037FF"
       height="60"
       viewBox="0 0 150 150"
       width="60"
@@ -247,7 +248,7 @@ exports[`AppPage should render the AppPage loading when first connected to Optim
       />
       <path
         d="M50.29 130.16a31.43 31.43 0 0 1 0-62.85V49.76a49 49 0 0 0-.14 98h.14Z"
-        style="fill: #0037ff;"
+        style="fill: #0037FF;"
       />
       <path
         d="M50.29 130.16v17.55a49 49 0 0 0 49-49H81.72a31.46 31.46 0 0 1-31.43 31.45Z"
@@ -502,6 +503,7 @@ exports[`AppPage should render the AppPage with Features and connect button 1`] 
     class="css-fngmsh"
   >
     <svg
+      arccolor="#0037FF"
       height="60"
       viewBox="0 0 150 150"
       width="60"
@@ -513,7 +515,7 @@ exports[`AppPage should render the AppPage with Features and connect button 1`] 
       />
       <path
         d="M50.29 130.16a31.43 31.43 0 0 1 0-62.85V49.76a49 49 0 0 0-.14 98h.14Z"
-        style="fill: #0037ff;"
+        style="fill: #0037FF;"
       />
       <path
         d="M50.29 130.16v17.55a49 49 0 0 0 49-49H81.72a31.46 31.46 0 0 1-31.43 31.45Z"
