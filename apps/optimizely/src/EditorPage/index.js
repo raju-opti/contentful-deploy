@@ -204,9 +204,13 @@ const fetchInitialData = async (sdk, client, slideInLevelPromise) => {
     return project.is_flags_enabled;
   }
 
+  const experimentKey = checkAndGetField(entry, fieldNames.experimentKey);
+  const isNewEntry = !experimentKey;
+
   const fetchPrimaryEnvironment = async () => {
-    // if entry alread has environment value, we don't need primary environment value
-    if (checkAndGetField(entry, fieldNames.environment)) {
+    // if new entry or if entry alread has environment value,
+    // we don't need primary environment value
+    if (isNewEntry || checkAndGetField(entry, fieldNames.environment)) {
       return undefined;
     }
     const envs = await client.getProjectEnvironments(optimizelyProjectId);
@@ -253,9 +257,6 @@ const fetchInitialData = async (sdk, client, slideInLevelPromise) => {
     getEntriesLinkedByIds(space, ids.entry),
     isFx ? client.getRules() : client.getExperiments(),
   ]);
-
-  const experimentKey = checkAndGetField(entry, fieldNames.experimentKey);
-  const isNewEntry = !experimentKey
 
   let reloadNeeded = isFx && !entryHasFxFields(entry);
 
@@ -307,7 +308,7 @@ const fetchInitialData = async (sdk, client, slideInLevelPromise) => {
   };
 };
 
-export default function EditorPage(props) { 
+export default function EditorPage(props) {
   const globalState = useMethods(methods, getInitialValue(props.sdk));
   const [state, actions] = globalState;
   const [showAuth, setShowAuth] = useState(isCloseToExpiration(props.expires));

@@ -33,7 +33,7 @@ exports[`ConnectButton should match snapshot 1`] = `
             y="0"
           />
           <g
-            transform="translate(5, 8)"
+            transform="translate(5, 9)"
           >
             <svg
               arccolor="#FFFFFF"

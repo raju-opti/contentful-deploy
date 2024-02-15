@@ -13,7 +13,7 @@ const AuthButton = (props) => {
         ConnectWithOptimizelyButton
       </title>
       <rect width="200" height="40" x="0" y="0" rx="6" ry="6" fill={colors.optimizelyBlue}/>
-      <g transform={"translate(5, 8)"}>
+      <g transform={"translate(5, 9)"}>
           <OptimizelyLogo width={"25"} height={"25"} arccolor={colors.white}/>
       </g>
       <g transform={"translate(32, 22)"}>
