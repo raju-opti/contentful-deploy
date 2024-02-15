@@ -38,11 +38,10 @@ if (window.location.hash) {
   window.close();
 }
 
-const OPTIMIZELY_CLIENT_APP_ID = '15687650042';
+const OPTIMIZELY_CLIENT_APP_ID = process.env.REACT_APP_OPTIMIZELY_CLIENT_APP_ID;
 const HOST = `${window.location.protocol}//${window.location.host}${window.location.pathname}`;
 
-// const redirectUrl = HOST;
-const redirectUrl = 'https://optimizely.ctfapps.net/';
+const redirectUrl = process.env.REACT_APP_OPTIMIZELY_OAUTH_REDIRECT_URL || HOST;
 
 const url = `https://app.optimizely.com/oauth2/authorize
 ?client_id=${OPTIMIZELY_CLIENT_APP_ID}
@@ -111,7 +110,7 @@ export default class App extends React.Component {
         const { data, origin } = event;
         const { token, expires } = data;
         
-        if (`${origin}${window.location.pathname}` !== redirectUrl || !token) {
+        if (origin !== new URL(redirectUrl).origin || !token) {
           return;
         }
 
